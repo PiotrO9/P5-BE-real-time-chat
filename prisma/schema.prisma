@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum ChatRole {
+  OWNER
+  MODERATOR
+  USER
+}
+
+model User {
+  id                   String           @id @default(uuid())
+  email                String           @unique
+  username             String           @unique
+  password             String
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  deletedAt            DateTime?        // soft delete timestamp
+  lastSeen             DateTime?        // last time user was online
+
+  sentFriendships      Friendship[]     @relation("SentFriendships")
+  receivedFriendships  Friendship[]     @relation("ReceivedFriendships")
+  sentInvites          FriendInvite[]   @relation("sender")
+  receivedInvites      FriendInvite[]   @relation("receiver")
+  chatUsers            ChatUser[]
+  messages             Message[]
+  reactions            MessageReaction[]
+  refreshTokens        RefreshToken[]
+  reads                MessageRead[]
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  deletedAt   DateTime?
+}
+
+model Chat {
+  id          String      @id @default(uuid())
+  name        String?     // only for group chats
+  isGroup     Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  createdBy   String?
+  updatedBy   String?
+
+  chatUsers   ChatUser[]
+  messages    Message[]
+
+  @@index([createdAt])
+  @@index([isGroup])
+}
+
+model ChatUser {
+  id         String    @id @default(uuid())
+  user       User      @relation(fields: [userId], references: [id])
+  userId     String
+  chat       Chat      @relation(fields: [chatId], references: [id])
+  chatId     String
+  role       ChatRole  @default(USER)
+  joinedAt   DateTime  @default(now())
+  deletedAt  DateTime?
+  createdBy  String?
+  updatedBy  String?
+
+  @@unique([userId, chatId])
+  @@index([chatId])
+  @@index([userId])
+}
+
+model Message {
+  id          String            @id @default(uuid())
+  chat        Chat              @relation(fields: [chatId], references: [id])
+  chatId      String
+  sender      User              @relation(fields: [senderId], references: [id])
+  senderId    String
+  content     String
+  wasUpdated  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+  createdBy   String?
+  updatedBy   String?
+
+  // self-relation: message replies
+  replyTo     Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
+  replyToId   String?
+  replies     Message[]         @relation("MessageReplies")
+
+  reactions   MessageReaction[]
+  reads       MessageRead[]
+
+  @@index([chatId, createdAt])
+  @@index([chatId, senderId])
+}
+
+model MessageRead {
+  id         String   @id @default(uuid())
+  message    Message  @relation(fields: [messageId], references: [id])
+  messageId  String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  readAt     DateTime @default(now())
+  deletedAt  DateTime?
+  createdBy  String?
+  updatedBy  String?
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model MessageReaction {
+  id         String   @id @default(uuid())
+  message    Message  @relation(fields: [messageId], references: [id])
+  messageId  String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  emoji      String
+  createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+  createdBy  String?
+  updatedBy  String?
+
+  @@unique([messageId, userId, emoji])
+  @@index([userId])
+}
+
+model Friendship {
+  id           String   @id @default(uuid())
+  requester    User     @relation("SentFriendships", fields: [requesterId], references: [id])
+  requesterId  String
+  addressee    User     @relation("ReceivedFriendships", fields: [addresseeId], references: [id])
+  addresseeId  String
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+  createdBy    String?
+  updatedBy    String?
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId])
+  @@index([addresseeId])
+}
+
+model FriendInvite {
+  id          String        @id @default(uuid())
+  sender      User          @relation("sender", fields: [senderId], references: [id])
+  senderId    String
+  receiver    User          @relation("receiver", fields: [receiverId], references: [id])
+  receiverId  String
+  status      InviteStatus  @default(PENDING)
+  createdAt   DateTime      @default(now())
+  deletedAt   DateTime?
+  createdBy   String?
+  updatedBy   String?
+
+  @@index([senderId])
+  @@index([receiverId])
+}

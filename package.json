@@ -1,0 +1,39 @@
+{
+	"name": "express-server",
+	"version": "1.0.0",
+	"description": "Express.js server with TypeScript",
+	"main": "dist/app.js",
+	"scripts": {
+		"dev": "nodemon src/app.ts",
+		"build": "tsc",
+		"start": "node dist/app.js",
+		"db:generate": "prisma generate",
+		"db:push": "prisma db push",
+		"db:migrate": "prisma migrate dev",
+		"db:studio": "prisma studio",
+		"docker:up": "docker-compose up --build",
+		"docker:down": "docker-compose down",
+		"docker:clean": "docker-compose down -v"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"type": "commonjs",
+	"dependencies": {
+		"@prisma/client": "^6.16.3",
+		"@typescript-eslint/eslint-plugin": "^8.45.0",
+		"@typescript-eslint/parser": "^8.45.0",
+		"cors": "^2.8.5",
+		"eslint": "^9.37.0",
+		"express": "^5.1.0"
+	},
+	"devDependencies": {
+		"@types/cors": "^2.8.19",
+		"@types/express": "^5.0.3",
+		"@types/node": "^24.6.2",
+		"nodemon": "^3.1.10",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.9.3",
+		"prisma": "^6.16.3"
+	}
+}
