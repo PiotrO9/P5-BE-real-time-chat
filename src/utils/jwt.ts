@@ -14,6 +14,9 @@ const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-s
 const ACCESS_TOKEN_EXPIRES_IN = '15m'; // 15 minutes
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // 7 days
 
+// Sliding session configuration
+export const SLIDING_SESSION_ENABLED = process.env.SLIDING_SESSION_ENABLED !== 'false'; // Default: true
+
 /**
  * Generate access token (short-lived)
  */

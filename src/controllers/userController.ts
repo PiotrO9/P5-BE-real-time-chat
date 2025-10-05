@@ -50,6 +50,7 @@ export const getUserProfile = async (req: Request, res: Response, next: NextFunc
 		});
 	} catch (error) {
 		next(error);
+		return;
 	}
 };
 
@@ -89,6 +90,7 @@ export const getAllUsers = async (req: Request, res: Response, next: NextFunctio
 		});
 	} catch (error) {
 		next(error);
+		return;
 	}
 };
 
@@ -159,6 +161,7 @@ export const updateUserProfile = async (req: Request, res: Response, next: NextF
 		});
 	} catch (error) {
 		next(error);
+		return;
 	}
 };
 
@@ -188,5 +191,6 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
 		});
 	} catch (error) {
 		next(error);
+		return;
 	}
 };

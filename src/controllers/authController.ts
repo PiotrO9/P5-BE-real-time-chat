@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '../../prisma/generated/prisma';
+import { PrismaClient } from '@prisma/client';
 import {
 	generateAccessToken,
 	generateRefreshToken,
@@ -51,20 +51,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 				username,
 				password: hashedPassword,
 			},
-			select: {
-				id: true,
-				email: true,
-				username: true,
-				createdAt: true,
-			},
 		});
 
 		res.status(201).json({
 			success: true,
 			message: 'User registered successfully',
-			data: {
-				user: newUser,
-			},
 		});
 	} catch (error) {
 		console.error('Registration error:', error);
@@ -141,9 +132,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 			message: 'Login successful',
 			data: {
 				user: {
-					id: user.id,
-					email: user.email,
 					username: user.username,
+					email: user.email,
 				},
 			},
 		});
@@ -269,7 +259,6 @@ export const me = async (req: Request, res: Response): Promise<void> => {
 		const user = await prisma.user.findUnique({
 			where: { id: userId },
 			select: {
-				id: true,
 				email: true,
 				username: true,
 				createdAt: true,
