@@ -1,40 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
-import { z } from 'zod';
+import { updatePasswordSchema } from '../utils/validationSchemas';
 
 const prisma = new PrismaClient();
 
-const registerSchema = z.object({
-	email: z.string().email('Invalid email format'),
-	username: z
-		.string()
-		.min(3, 'Username must be at least 3 characters')
-		.max(30, 'Username must be less than 30 characters'),
-	password: z
-		.string()
-		.min(6, 'Password must be at least 6 characters')
-		.max(100, 'Password must be less than 100 characters'),
-});
-
-const loginSchema = z.object({
-	email: z.string().email('Invalid email format'),
-	password: z.string().min(1, 'Password is required'),
-});
-
-const updatePasswordSchema = z.object({
-	currentPassword: z.string().min(1, 'Current password is required'),
-	newPassword: z
-		.string()
-		.min(8, 'New password must be at least 8 characters')
-		.max(128, 'New password must be less than 128 characters')
-		.regex(/[a-z]/, 'New password must contain at least one lowercase letter')
-		.regex(/[A-Z]/, 'New password must contain at least one uppercase letter')
-		.regex(/[0-9]/, 'New password must contain at least one number')
-		.regex(/[^a-zA-Z0-9]/, 'New password must contain at least one special character'),
-});
-
-export const getUserProfile = async (req: Request, res: Response, next: NextFunction) => {
+export async function getUserProfile(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
 
@@ -63,9 +34,9 @@ export const getUserProfile = async (req: Request, res: Response, next: NextFunc
 		next(error);
 		return;
 	}
-};
+}
 
-export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
+export async function getAllUsers(req: Request, res: Response, next: NextFunction) {
 	try {
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 10;
@@ -103,9 +74,9 @@ export const getAllUsers = async (req: Request, res: Response, next: NextFunctio
 		next(error);
 		return;
 	}
-};
+}
 
-export const updateUserProfile = async (req: Request, res: Response, next: NextFunction) => {
+export async function updateUserProfile(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
 		const { username, email } = req.body;
@@ -174,9 +145,9 @@ export const updateUserProfile = async (req: Request, res: Response, next: NextF
 		next(error);
 		return;
 	}
-};
+}
 
-export const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
+export async function deleteUser(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
 
@@ -204,7 +175,7 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
 		next(error);
 		return;
 	}
-};
+}
 
 export async function getUserStatus(req: Request, res: Response, next: NextFunction) {
 	try {

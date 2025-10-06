@@ -9,6 +9,7 @@ import {
 	clearAuthCookies,
 	TokenPayload,
 } from '../utils/jwt';
+import { loginSchema, registerSchema } from '../utils/validationSchemas';
 
 const prisma = new PrismaClient();
 
@@ -16,17 +17,23 @@ const prisma = new PrismaClient();
  * Register new user
  * POST /api/auth/register
  */
-export const register = async (req: Request, res: Response): Promise<void> => {
+export async function register(req: Request, res: Response): Promise<void> {
 	try {
-		const { email, username, password } = req.body;
+		const validationResult = registerSchema.safeParse(req.body);
 
-		if (!email || !username || !password) {
+		if (!validationResult.success) {
 			res.status(400).json({
 				success: false,
-				message: 'Email, username, and password are required',
+				message: 'Validation failed',
+				details: validationResult.error.issues.map(issue => ({
+					field: issue.path.join('.'),
+					message: issue.message,
+				})),
 			});
 			return;
 		}
+
+		const { email, username, password } = validationResult.data;
 
 		const existingUser = await prisma.user.findFirst({
 			where: {
@@ -64,23 +71,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 			message: 'Internal server error',
 		});
 	}
-};
+}
 
 /**
  * Login user
  * POST /api/auth/login
  */
-export const login = async (req: Request, res: Response): Promise<void> => {
+export async function login(req: Request, res: Response): Promise<void> {
 	try {
-		const { email, password } = req.body;
+		const validationResult = loginSchema.safeParse(req.body);
 
-		if (!email || !password) {
+		if (!validationResult.success) {
 			res.status(400).json({
 				success: false,
-				message: 'Email and password are required',
+				message: 'Validation failed',
+				details: validationResult.error.issues.map(issue => ({
+					field: issue.path.join('.'),
+					message: issue.message,
+				})),
 			});
 			return;
 		}
+
+		const { email, password } = validationResult.data;
 
 		const user = await prisma.user.findUnique({
 			where: { email },
@@ -145,13 +158,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 			message: 'Internal server error',
 		});
 	}
-};
+}
 
 /**
  * Refresh access token
  * POST /api/auth/refresh
  */
-export const refresh = async (req: Request, res: Response): Promise<void> => {
+export async function refresh(req: Request, res: Response): Promise<void> {
 	try {
 		const { refreshToken } = req.cookies;
 
@@ -210,13 +223,13 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
 			message: 'Internal server error',
 		});
 	}
-};
+}
 
 /**
  * Logout user
  * POST /api/auth/logout
  */
-export const logout = async (req: Request, res: Response): Promise<void> => {
+export async function logout(req: Request, res: Response): Promise<void> {
 	try {
 		const { refreshToken } = req.cookies;
 
@@ -239,13 +252,13 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
 			message: 'Internal server error',
 		});
 	}
-};
+}
 
 /**
  * Get current user data
  * GET /api/auth/me
  */
-export const me = async (req: Request, res: Response): Promise<void> => {
+export async function me(req: Request, res: Response): Promise<void> {
 	try {
 		const userId = (req as any).user?.userId;
 
@@ -288,4 +301,4 @@ export const me = async (req: Request, res: Response): Promise<void> => {
 			message: 'Internal server error',
 		});
 	}
-};
+}
