@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 
@@ -21,6 +20,18 @@ const registerSchema = z.object({
 const loginSchema = z.object({
 	email: z.string().email('Invalid email format'),
 	password: z.string().min(1, 'Password is required'),
+});
+
+const updatePasswordSchema = z.object({
+	currentPassword: z.string().min(1, 'Current password is required'),
+	newPassword: z
+		.string()
+		.min(8, 'New password must be at least 8 characters')
+		.max(128, 'New password must be less than 128 characters')
+		.regex(/[a-z]/, 'New password must contain at least one lowercase letter')
+		.regex(/[A-Z]/, 'New password must contain at least one uppercase letter')
+		.regex(/[0-9]/, 'New password must contain at least one number')
+		.regex(/[^a-zA-Z0-9]/, 'New password must contain at least one special character'),
 });
 
 export const getUserProfile = async (req: Request, res: Response, next: NextFunction) => {
@@ -211,6 +222,69 @@ export async function getUserStatus(req: Request, res: Response, next: NextFunct
 
 		return res.status(200).json({
 			status: user.isOnline ? 'online' : 'offline',
+		});
+	} catch (error) {
+		next(error);
+		return;
+	}
+}
+
+export async function updateUserPassword(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.params.id;
+
+		if (!req.user || req.user.userId !== userId) {
+			return res.status(403).json({
+				error: 'You can only change your own password',
+			});
+		}
+
+		const validationResult = updatePasswordSchema.safeParse(req.body);
+
+		if (!validationResult.success) {
+			return res.status(400).json({
+				error: 'Validation failed',
+				details: validationResult.error.issues.map(issue => ({
+					field: issue.path.join('.'),
+					message: issue.message,
+				})),
+			});
+		}
+
+		const { currentPassword, newPassword } = validationResult.data;
+
+		if (currentPassword === newPassword) {
+			return res.status(400).json({
+				error: 'New password must be different from current password',
+			});
+		}
+
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+		});
+
+		if (!user) {
+			return res.status(404).json({
+				error: 'User not found',
+			});
+		}
+
+		const isMatch = await bcrypt.compare(currentPassword, user.password);
+		if (!isMatch) {
+			return res.status(400).json({
+				error: 'Current password is incorrect',
+			});
+		}
+
+		const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+
+		await prisma.user.update({
+			where: { id: userId },
+			data: { password: hashedNewPassword },
+		});
+
+		return res.status(200).json({
+			message: 'Password updated successfully',
 		});
 	} catch (error) {
 		next(error);

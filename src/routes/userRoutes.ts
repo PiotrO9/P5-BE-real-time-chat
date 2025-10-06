@@ -5,6 +5,7 @@ import {
 	updateUserProfile,
 	deleteUser,
 	getUserStatus,
+	updateUserPassword,
 } from '../controllers/userController';
 import { authenticateToken, authorizeUserModification } from '../middleware/auth';
 
@@ -31,8 +32,12 @@ router.get('/:id', authenticateToken, getUserProfile);
  */
 router.get('/:id/status', authenticateToken, getUserStatus);
 
-// TODO
-router.patch('/:id/password', authenticateToken);
+/**
+ * @route PATCH /api/users/:id/password
+ * @desc Update a user's password by ID
+ * @access Private (only the user themselves can update their password)
+ */
+router.patch('/:id/password', authenticateToken, authorizeUserModification, updateUserPassword);
 
 /**
  * @route PUT /api/users/:id
