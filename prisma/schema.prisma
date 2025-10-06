@@ -28,6 +28,7 @@ model User {
   updatedAt            DateTime         @updatedAt
   deletedAt            DateTime?        // soft delete timestamp
   lastSeen             DateTime?        // last time user was online
+  isOnline             Boolean          @default(false)
 
   sentFriendships      Friendship[]     @relation("SentFriendships")
   receivedFriendships  Friendship[]     @relation("ReceivedFriendships")
