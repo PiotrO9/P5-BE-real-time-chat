@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ResponseHelper } from '../utils/responseHelper';
 import { ChatService } from '../services/chatService';
-import { createChatSchema } from '../utils/validationSchemas';
+import { createChatSchema, updateChatSchema } from '../utils/validationSchemas';
 import { ZodError } from 'zod';
 
 const chatService = new ChatService();
@@ -122,6 +122,33 @@ export async function updateChat(req: Request, res: Response, next: NextFunction
 		if (!userId) {
 			ResponseHelper.unauthorized(res);
 			return;
+		}
+
+		const chatId = req.params.id;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		// Validate request body
+		try {
+			const validatedData = updateChatSchema.parse(req.body);
+
+			// Update chat
+			const updatedChat = await chatService.updateChat(userId, chatId, validatedData.name);
+
+			ResponseHelper.success(res, 'Chat updated successfully', updatedChat);
+		} catch (error) {
+			if (error instanceof ZodError) {
+				const errors = error.issues.map((err: any) => ({
+					field: err.path.join('.'),
+					message: err.message,
+				}));
+				ResponseHelper.error(res, 'Validation failed', 400, errors);
+				return;
+			}
+			throw error;
 		}
 	} catch (error) {
 		next(error);

@@ -705,4 +705,51 @@ export class ChatService {
 			},
 		});
 	}
+
+	/**
+	 * Updates a group chat's settings (name)
+	 * Only OWNER or MODERATOR can update chat settings
+	 */
+	async updateChat(userId: string, chatId: string, name: string): Promise<ChatResponse> {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+			include: {
+				chat: true,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if it's a group chat
+		if (!chatUser.chat.isGroup) {
+			throw new Error('Cannot update 1-on-1 chat settings');
+		}
+
+		// Check if user has permission to update chat (must be OWNER or MODERATOR)
+		if (chatUser.role !== ChatRole.OWNER && chatUser.role !== ChatRole.MODERATOR) {
+			throw new Error('Only chat owner or moderator can update chat settings');
+		}
+
+		// Update chat
+		await prisma.chat.update({
+			where: {
+				id: chatId,
+			},
+			data: {
+				name: name,
+				updatedBy: userId,
+			},
+		});
+
+		// Return updated chat
+		const updatedChat = await this.getChatById(userId, chatId);
+		return updatedChat;
+	}
 }

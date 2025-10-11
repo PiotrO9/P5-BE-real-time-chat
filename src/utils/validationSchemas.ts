@@ -56,3 +56,10 @@ export const createChatSchema = z
 		message: 'Group chat must have at least 2 participants',
 		path: ['participantIds'],
 	});
+
+export const updateChatSchema = z.object({
+	name: z
+		.string()
+		.min(1, 'Chat name is required')
+		.max(100, 'Chat name must be less than 100 characters'),
+});
