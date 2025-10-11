@@ -1,37 +1,42 @@
 # 🚀 Express.js + TypeScript + WebSocket Server
 
-Nowoczesny serwer Express.js z TypeScript i obsługą WebSocketów za pomocą Socket.IO.
+Modern Express.js server with TypeScript and WebSocket support using Socket.IO.
 
-## ✨ Funkcjonalności
+## ✨ Features
 
-- **Express.js** - Framework webowy dla Node.js
-- **TypeScript** - Statyczne typowanie dla JavaScript
-- **Socket.IO** - Dwukierunkowa komunikacja w czasie rzeczywistym
+- **Express.js** - Web framework for Node.js
+- **TypeScript** - Static typing for JavaScript
+- **Socket.IO** - Bidirectional real-time communication
 - **CORS** - Cross-Origin Resource Sharing
-- **Nodemon** - Automatyczne restartowanie serwera podczas rozwoju
+- **Nodemon** - Automatic server restart during development
 
-## 🛠️ Konfiguracja i uruchomienie
+## 🛠️ Configuration and Setup
 
-### Wymagania
-- Node.js (v18 lub nowszy)
+### Requirements
+
+- Node.js (v18 or newer)
 - npm
 
-### Instalacja
+### Installation
+
 ```bash
 npm install
 ```
 
-### Uruchomienie w trybie deweloperskim
+### Running in development mode
+
 ```bash
 npm run dev
 ```
 
-### Budowanie projektu
+### Building the project
+
 ```bash
 npm run build
 ```
 
-### Uruchomienie w trybie produkcyjnym
+### Running in production mode
+
 ```bash
 npm run build
 npm start
@@ -40,126 +45,139 @@ npm start
 ## 📡 API Endpoints
 
 ### HTTP REST API
-- `GET /` - Sprawdzenie statusu serwera
-- `GET /api/health` - Health check z dodatkowymi informacjami
-- `GET /api/stats` - Statystyki serwera WebSocket
+
+- `GET /` - Server status check
+- `GET /api/health` - Health check with additional information
+- `GET /api/stats` - WebSocket server statistics
 
 ### WebSocket Events
 
 #### Client → Server
-- `joinRoom({ roomId: string, username: string })` - Dołączenie do pokoju
-- `leaveRoom(roomId: string)` - Opuszczenie pokoju
-- `sendMessage({ roomId: string, content: string })` - Wysłanie wiadomości
-- `ping()` - Ping serwera
+
+- `joinRoom({ roomId: string, username: string })` - Join a room
+- `leaveRoom(roomId: string)` - Leave a room
+- `sendMessage({ roomId: string, content: string })` - Send a message
+- `ping()` - Ping the server
 
 #### Server → Client
-- `connected({ message: string, timestamp: Date })` - Potwierdzenie połączenia
-- `userJoined(user: User)` - Nowy użytkownik dołączył do pokoju
-- `userLeft(user: User)` - Użytkownik opuścił pokój
-- `messageReceived(message: Message)` - Nowa wiadomość w pokoju
-- `roomJoined(room: Room)` - Potwierdzenie dołączenia do pokoju
-- `roomLeft(roomId: string)` - Potwierdzenie opuszczenia pokoju
-- `roomUsers(users: User[])` - Lista użytkowników w pokoju
-- `error(error: string)` - Komunikat błędu
 
-## 🧪 Testowanie
+- `connected({ message: string, timestamp: Date })` - Connection confirmation
+- `userJoined(user: User)` - New user joined the room
+- `userLeft(user: User)` - User left the room
+- `messageReceived(message: Message)` - New message in the room
+- `roomJoined(room: Room)` - Room join confirmation
+- `roomLeft(roomId: string)` - Room leave confirmation
+- `roomUsers(users: User[])` - List of users in the room
+- `error(error: string)` - Error message
 
-### Test klient WebSocket
-Otwórz przeglądarkę i przejdź do:
+## 🧪 Testing
+
+### WebSocket Test Client
+
+Open your browser and navigate to:
+
 ```
 http://localhost:3000
 ```
 
-Znajdziesz tam interaktywny klient WebSocket, który pozwala:
-- Łączyć się z serwerem
-- Dołączać do pokojów
-- Wysyłać wiadomości
-- Sprawdzać status użytkowników
+You will find an interactive WebSocket client that allows you to:
 
-### Przykład kodu klienta JavaScript
+- Connect to the server
+- Join rooms
+- Send messages
+- Check user status
+
+### JavaScript Client Code Example
+
 ```javascript
 const socket = io('http://localhost:3000');
 
-// Połączenie
+// Connection
 socket.on('connect', () => {
-  console.log('Połączono z serwerem');
+	console.log('Connected to server');
 });
 
-// Dołączenie do pokoju
-socket.emit('joinRoom', { 
-  roomId: 'room1', 
-  username: 'JanKowalski' 
+// Join room
+socket.emit('joinRoom', {
+	roomId: 'room1',
+	username: 'JohnDoe',
 });
 
-// Wysłanie wiadomości
-socket.emit('sendMessage', { 
-  roomId: 'room1', 
-  content: 'Witaj świecie!' 
+// Send message
+socket.emit('sendMessage', {
+	roomId: 'room1',
+	content: 'Hello world!',
 });
 
-// Odbiór wiadomości
-socket.on('messageReceived', (message) => {
-  console.log(`${message.username}: ${message.content}`);
+// Receive message
+socket.on('messageReceived', message => {
+	console.log(`${message.username}: ${message.content}`);
 });
 ```
 
-## 📁 Struktura projektu
+## 📁 Project Structure
 
 ```
 src/
-├── app.ts              # Główny plik aplikacji
-├── routes/             # Routery Express
+├── app.ts              # Main application file
+├── routes/             # Express routers
 │   └── api.ts         # API endpoints
-├── socket/             # Obsługa WebSocket
+├── socket/             # WebSocket handling
 │   └── socketHandlers.ts
-├── types/              # Definicje typów TypeScript
+├── types/              # TypeScript type definitions
 │   └── socket.types.ts
-└── controllers/        # Kontrolery (do przyszłego rozwoju)
+└── controllers/        # Controllers (for future development)
 
 public/
-└── index.html          # Test klient WebSocket
+└── index.html          # WebSocket test client
 
-dist/                   # Skompilowane pliki (po npm run build)
+dist/                   # Compiled files (after npm run build)
 ```
 
-## 🔧 Konfiguracja
+## 🔧 Configuration
 
-### Zmienne środowiskowe
-Stwórz plik `.env` (opcjonalnie):
+### Environment Variables
+
+Create a `.env` file (optional):
+
 ```
 PORT=3000
 NODE_ENV=development
 ```
 
 ### TypeScript
-Konfiguracja w `tsconfig.json` jest już skonfigurowana dla:
+
+Configuration in `tsconfig.json` is already set up for:
+
 - ES2020 target
 - CommonJS modules
-- Ścisłe typowanie
+- Strict typing
 - Source maps
-- Dekoratory
+- Decorators
 
 ### Socket.IO
-- CORS włączony dla wszystkich origin
-- Obsługa wielopokojowa
-- Automatyczne czyszczenie pustych pokoi
-- Przechowywanie użytkowników i wiadomości w pamięci
 
-## 🚀 Dalszy rozwój
+- CORS enabled for all origins
+- Multi-room support
+- Automatic cleanup of empty rooms
+- In-memory storage of users and messages
 
-### Sugestie rozbudowy:
-1. **Baza danych** - Integracja z MongoDB/PostgreSQL dla trwałego przechowywania
-2. **Autoryzacja** - JWT tokens i system uprawnień
-3. **Redis** - Dla skalowania WebSocket między wieloma instancjami
-4. **Logi** - Winston lub podobna biblioteka do logowania
-5. **Testy** - Jest, Supertest dla testów jednostkowych i integracyjnych
-6. **Docker** - Konteneryzacja aplikacji
-7. **API Rate limiting** - Ograniczenie liczby zapytań
-8. **WebRTC** - Dla połączeń audio/video
-9. **File upload** - Przesyłanie plików przez WebSocket
-10. **Notifications** - System powiadomień push
+## 🚀 Future Development
 
-## 📝 Licencja
+### Expansion Suggestions:
+
+1. **Database** - Integration with MongoDB/PostgreSQL for persistent storage
+2. **Authorization** - JWT tokens and permissions system
+3. **Redis** - For scaling WebSocket across multiple instances
+4. **Logging** - Winston or similar library for logging
+5. **Tests** - Jest, Supertest for unit and integration tests
+6. **Docker** - Application containerization
+7. **API Rate limiting** - Request rate limiting
+8. **WebRTC** - For audio/video connections
+9. **File upload** - File upload via WebSocket
+10. **Notifications** - Push notification system
+
+## 📝 License
 
 ISC License
 

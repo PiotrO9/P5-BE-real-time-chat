@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-// Globalne middleware do obsługi błędów
+// Global middleware for error handling
 export const errorHandler = (error: any, req: Request, res: Response, next: NextFunction): void => {
 	console.error('Error:', error);
 

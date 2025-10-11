@@ -2,67 +2,72 @@ import { Response } from 'express';
 import { ApiResponse } from '../types/friends';
 
 /**
- * Helper do tworzenia standardowych odpowiedzi API
+ * Helper for creating standard API responses
  */
 export class ResponseHelper {
-  /**
-   * Tworzy odpowiedź sukcesu
-   */
-  static success<T>(res: Response, message: string, data?: T, statusCode: number = 200): void {
-    const response: ApiResponse<T> = {
-      success: true,
-      message,
-      ...(data && { data })
-    };
-    
-    res.status(statusCode).json(response);
-  }
+	/**
+	 * Creates a success response
+	 */
+	static success<T>(res: Response, message: string, data?: T, statusCode: number = 200): void {
+		const response: ApiResponse<T> = {
+			success: true,
+			message,
+			...(data && { data }),
+		};
 
-  /**
-   * Tworzy odpowiedź błędu
-   */
-  static error(res: Response, message: string, statusCode: number = 400, errors?: Array<{ field: string; message: string }>): void {
-    const response: ApiResponse = {
-      success: false,
-      message,
-      ...(errors && { errors })
-    };
-    
-    res.status(statusCode).json(response);
-  }
+		res.status(statusCode).json(response);
+	}
 
-  /**
-   * Tworzy odpowiedź błędu walidacji
-   */
-  static validationError(res: Response, errors: Array<{ field: string; message: string }>): void {
-    this.error(res, 'Nieprawidłowe dane', 400, errors);
-  }
+	/**
+	 * Creates an error response
+	 */
+	static error(
+		res: Response,
+		message: string,
+		statusCode: number = 400,
+		errors?: Array<{ field: string; message: string }>,
+	): void {
+		const response: ApiResponse = {
+			success: false,
+			message,
+			...(errors && { errors }),
+		};
 
-  /**
-   * Tworzy odpowiedź błędu autoryzacji
-   */
-  static unauthorized(res: Response, message: string = 'Brak autoryzacji użytkownika'): void {
-    this.error(res, message, 401);
-  }
+		res.status(statusCode).json(response);
+	}
 
-  /**
-   * Tworzy odpowiedź błędu uprawnień
-   */
-  static forbidden(res: Response, message: string = 'Brak uprawnień'): void {
-    this.error(res, message, 403);
-  }
+	/**
+	 * Creates a validation error response
+	 */
+	static validationError(res: Response, errors: Array<{ field: string; message: string }>): void {
+		this.error(res, 'Invalid data', 400, errors);
+	}
 
-  /**
-   * Tworzy odpowiedź błędu nie znaleziono
-   */
-  static notFound(res: Response, message: string = 'Nie znaleziono'): void {
-    this.error(res, message, 404);
-  }
+	/**
+	 * Creates an unauthorized error response
+	 */
+	static unauthorized(res: Response, message: string = 'User authorization required'): void {
+		this.error(res, message, 401);
+	}
 
-  /**
-   * Tworzy odpowiedź błędu serwera
-   */
-  static serverError(res: Response, message: string = 'Błąd serwera'): void {
-    this.error(res, message, 500);
-  }
+	/**
+	 * Creates a forbidden error response
+	 */
+	static forbidden(res: Response, message: string = 'Insufficient permissions'): void {
+		this.error(res, message, 403);
+	}
+
+	/**
+	 * Creates a not found error response
+	 */
+	static notFound(res: Response, message: string = 'Not found'): void {
+		this.error(res, message, 404);
+	}
+
+	/**
+	 * Creates a server error response
+	 */
+	static serverError(res: Response, message: string = 'Server error'): void {
+		this.error(res, message, 500);
+	}
 }
