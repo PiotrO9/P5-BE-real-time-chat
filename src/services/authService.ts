@@ -16,9 +16,11 @@ const prisma = new PrismaClient();
 export async function registerUser(data: RegisterUserData): Promise<void> {
 	const { email, username, password } = data;
 
+	// Check only active users (not deleted)
 	const existingUser = await prisma.user.findFirst({
 		where: {
 			OR: [{ email }, { username }],
+			deletedAt: null,
 		},
 	});
 
@@ -48,6 +50,11 @@ export async function loginUser(email: string, password: string): Promise<LoginR
 
 	if (!user) {
 		throw new AuthServiceError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
+	}
+
+	// Check if account is deleted
+	if (user.deletedAt !== null) {
+		throw new AuthServiceError('This account has been deleted', 403, 'ACCOUNT_DELETED');
 	}
 
 	const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -109,6 +116,15 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
 		throw new AuthServiceError('Refresh token expired or not found', 401, 'TOKEN_EXPIRED');
 	}
 
+	// Check if user account is deleted
+	if (storedToken.user.deletedAt !== null) {
+		// Delete refresh token for deleted user
+		await prisma.refreshToken.delete({
+			where: { token: refreshToken },
+		});
+		throw new AuthServiceError('This account has been deleted', 403, 'ACCOUNT_DELETED');
+	}
+
 	const newAccessToken = generateAccessToken({
 		userId: storedToken.user.id,
 		email: storedToken.user.email,
@@ -137,6 +153,7 @@ export async function getUserData(userId: string): Promise<UserData> {
 			username: true,
 			createdAt: true,
 			lastSeen: true,
+			deletedAt: true,
 		},
 	});
 
@@ -144,5 +161,13 @@ export async function getUserData(userId: string): Promise<UserData> {
 		throw new AuthServiceError('User not found', 404, 'USER_NOT_FOUND');
 	}
 
-	return user;
+	// Check if account is deleted
+	if (user.deletedAt !== null) {
+		throw new AuthServiceError('This account has been deleted', 403, 'ACCOUNT_DELETED');
+	}
+
+	// Remove deletedAt from response
+	const { deletedAt, ...userData } = user;
+
+	return userData;
 }
