@@ -345,7 +345,134 @@ export async function getInvites(req: Request, res: Response, next: NextFunction
 
 export async function acceptInvite(req: Request, res: Response, next: NextFunction) {
     try {
-        const userId = req.params.id;
+        const currentUserId = req.user?.userId;
+        const inviteId = req.params.id;
+
+        if (!currentUserId) {
+            res.status(401).json({
+                success: false,
+                message: 'Brak autoryzacji użytkownika'
+            });
+            return;
+        }
+
+        if (!inviteId) {
+            res.status(400).json({
+                success: false,
+                message: 'Brak ID zaproszenia'
+            });
+            return;
+        }
+
+        // Znajdź zaproszenie
+        const invite = await prisma.friendInvite.findUnique({
+            where: {
+                id: inviteId,
+                deletedAt: null
+            },
+            include: {
+                sender: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true
+                    }
+                },
+                receiver: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (!invite) {
+            res.status(404).json({
+                success: false,
+                message: 'Zaproszenie nie zostało znalezione'
+            });
+            return;
+        }
+
+        // Sprawdź czy użytkownik może zaakceptować to zaproszenie
+        if (invite.receiverId !== currentUserId) {
+            res.status(403).json({
+                success: false,
+                message: 'Nie masz uprawnień do zaakceptowania tego zaproszenia'
+            });
+            return;
+        }
+
+        // Sprawdź czy zaproszenie jest w stanie PENDING
+        if (invite.status !== 'PENDING') {
+            res.status(400).json({
+                success: false,
+                message: 'Zaproszenie nie może być zaakceptowane'
+            });
+            return;
+        }
+
+        // Sprawdź czy już nie są znajomymi
+        const existingFriendship = await prisma.friendship.findFirst({
+            where: {
+                OR: [
+                    { requesterId: invite.senderId, addresseeId: invite.receiverId },
+                    { requesterId: invite.receiverId, addresseeId: invite.senderId }
+                ],
+                deletedAt: null
+            }
+        });
+
+        if (existingFriendship) {
+            res.status(400).json({
+                success: false,
+                message: 'Już jesteście znajomymi'
+            });
+            return;
+        }
+
+        // Rozpocznij transakcję
+        await prisma.$transaction(async (tx) => {
+            // Zaktualizuj status zaproszenia na ACCEPTED
+            await tx.friendInvite.update({
+                where: { id: inviteId },
+                data: { 
+                    status: 'ACCEPTED',
+                    updatedBy: currentUserId
+                }
+            });
+
+            // Utwórz relację znajomości
+            await tx.friendship.create({
+                data: {
+                    requesterId: invite.senderId,
+                    addresseeId: invite.receiverId,
+                    createdBy: currentUserId
+                }
+            });
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Zaakceptowano zaproszenie od ${invite.sender.username}`,
+            data: {
+                friendship: {
+                    requester: {
+                        id: invite.sender.id,
+                        username: invite.sender.username,
+                        email: invite.sender.email
+                    },
+                    addressee: {
+                        id: invite.receiver.id,
+                        username: invite.receiver.username,
+                        email: invite.receiver.email
+                    }
+                }
+            }
+        });
+
     } catch (error) {
         next(error);
         return;
@@ -354,7 +481,100 @@ export async function acceptInvite(req: Request, res: Response, next: NextFuncti
 
 export async function rejectInvite(req: Request, res: Response, next: NextFunction) {
     try {
-        const userId = req.params.id;
+        const currentUserId = req.user?.userId;
+        const inviteId = req.params.id;
+
+        if (!currentUserId) {
+            res.status(401).json({
+                success: false,
+                message: 'Brak autoryzacji użytkownika'
+            });
+            return;
+        }
+
+        if (!inviteId) {
+            res.status(400).json({
+                success: false,
+                message: 'Brak ID zaproszenia'
+            });
+            return;
+        }
+
+        // Znajdź zaproszenie
+        const invite = await prisma.friendInvite.findUnique({
+            where: {
+                id: inviteId,
+                deletedAt: null
+            },
+            include: {
+                sender: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true
+                    }
+                },
+                receiver: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (!invite) {
+            res.status(404).json({
+                success: false,
+                message: 'Zaproszenie nie zostało znalezione'
+            });
+            return;
+        }
+
+        // Sprawdź czy użytkownik może odrzucić to zaproszenie
+        if (invite.receiverId !== currentUserId) {
+            res.status(403).json({
+                success: false,
+                message: 'Nie masz uprawnień do odrzucenia tego zaproszenia'
+            });
+            return;
+        }
+
+        // Sprawdź czy zaproszenie jest w stanie PENDING
+        if (invite.status !== 'PENDING') {
+            res.status(400).json({
+                success: false,
+                message: 'Zaproszenie nie może być odrzucone'
+            });
+            return;
+        }
+
+        // Zaktualizuj status zaproszenia na REJECTED
+        await prisma.friendInvite.update({
+            where: { id: inviteId },
+            data: { 
+                status: 'REJECTED',
+                updatedBy: currentUserId
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Odrzucono zaproszenie od ${invite.sender.username}`,
+            data: {
+                invite: {
+                    id: invite.id,
+                    status: 'REJECTED',
+                    sender: {
+                        id: invite.sender.id,
+                        username: invite.sender.username,
+                        email: invite.sender.email
+                    }
+                }
+            }
+        });
+
     } catch (error) {
         next(error);
         return;
