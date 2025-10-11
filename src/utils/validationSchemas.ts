@@ -32,3 +32,27 @@ export const updatePasswordSchema = z.object({
 export const inviteFriendSchema = z.object({
 	username: z.string().min(1, 'Username is required'),
 });
+
+export const createChatSchema = z
+	.object({
+		// For 1-on-1 chat
+		participantId: z.string().uuid('Invalid participant ID').optional(),
+		// For group chat
+		name: z
+			.string()
+			.min(1, 'Chat name is required')
+			.max(100, 'Chat name must be less than 100 characters')
+			.optional(),
+		participantIds: z.array(z.string().uuid('Invalid participant ID')).optional(),
+	})
+	.refine(data => data.participantId || (data.name && data.participantIds), {
+		message:
+			'Either participantId (for 1-on-1 chat) or name and participantIds (for group chat) must be provided',
+	})
+	.refine(data => !(data.participantId && (data.name || data.participantIds)), {
+		message: 'Cannot create both 1-on-1 and group chat at the same time',
+	})
+	.refine(data => !data.participantIds || data.participantIds.length >= 2, {
+		message: 'Group chat must have at least 2 participants',
+		path: ['participantIds'],
+	});

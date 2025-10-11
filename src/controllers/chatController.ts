@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ResponseHelper } from '../utils/responseHelper';
 import { ChatService } from '../services/chatService';
+import { createChatSchema } from '../utils/validationSchemas';
+import { ZodError } from 'zod';
 
 const chatService = new ChatService();
 
@@ -25,6 +27,12 @@ export async function getChats(req: Request, res: Response, next: NextFunction) 
 	}
 }
 
+/**
+ * Create a new chat (1-on-1 or group)
+ * POST /api/chats
+ * Body: { participantId: string } for 1-on-1 chat
+ *       { name: string, participantIds: string[] } for group chat
+ */
 export async function createChat(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -32,6 +40,26 @@ export async function createChat(req: Request, res: Response, next: NextFunction
 		if (!userId) {
 			ResponseHelper.unauthorized(res);
 			return;
+		}
+
+		// Validate request body
+		try {
+			const validatedData = createChatSchema.parse(req.body);
+
+			// Create chat
+			const chat = await chatService.createChat(userId, validatedData);
+
+			ResponseHelper.success(res, 'Chat created successfully', chat, 201);
+		} catch (error) {
+			if (error instanceof ZodError) {
+				const errors = error.issues.map((err: any) => ({
+					field: err.path.join('.'),
+					message: err.message,
+				}));
+				ResponseHelper.error(res, 'Validation failed', 400, errors);
+				return;
+			}
+			throw error;
 		}
 	} catch (error) {
 		next(error);
