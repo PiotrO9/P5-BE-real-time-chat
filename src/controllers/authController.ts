@@ -1,17 +1,14 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
-import {
-	generateAccessToken,
-	generateRefreshToken,
-	verifyRefreshToken,
-	setAuthCookies,
-	clearAuthCookies,
-	TokenPayload,
-} from '../utils/jwt';
+import { setAuthCookies, clearAuthCookies } from '../utils/jwt';
 import { loginSchema, registerSchema } from '../utils/validationSchemas';
-
-const prisma = new PrismaClient();
+import {
+	registerUser,
+	loginUser,
+	refreshAccessToken,
+	logoutUser,
+	getUserData,
+} from '../services/authService';
+import { AuthServiceError } from '../types/auth';
 
 /**
  * Register new user
@@ -35,36 +32,21 @@ export async function register(req: Request, res: Response): Promise<void> {
 
 		const { email, username, password } = validationResult.data;
 
-		const existingUser = await prisma.user.findFirst({
-			where: {
-				OR: [{ email }, { username }],
-			},
-		});
-
-		if (existingUser) {
-			res.status(409).json({
-				success: false,
-				message: 'User with this email or username already exists',
-			});
-			return;
-		}
-
-		const saltRounds = 12;
-		const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-		const newUser = await prisma.user.create({
-			data: {
-				email,
-				username,
-				password: hashedPassword,
-			},
-		});
+		await registerUser({ email, username, password });
 
 		res.status(201).json({
 			success: true,
 			message: 'User registered successfully',
 		});
 	} catch (error) {
+		if (error instanceof AuthServiceError) {
+			res.status(error.statusCode).json({
+				success: false,
+				message: error.message,
+			});
+			return;
+		}
+
 		console.error('Registration error:', error);
 		res.status(500).json({
 			success: false,
@@ -95,63 +77,26 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 		const { email, password } = validationResult.data;
 
-		const user = await prisma.user.findUnique({
-			where: { email },
-		});
+		const result = await loginUser(email, password);
 
-		if (!user) {
-			res.status(401).json({
-				success: false,
-				message: 'Invalid credentials',
-			});
-			return;
-		}
-
-		const isPasswordValid = await bcrypt.compare(password, user.password);
-
-		if (!isPasswordValid) {
-			res.status(401).json({
-				success: false,
-				message: 'Invalid credentials',
-			});
-			return;
-		}
-
-		const tokenPayload: TokenPayload = {
-			userId: user.id,
-			email: user.email,
-		};
-
-		const accessToken = generateAccessToken(tokenPayload);
-		const refreshToken = generateRefreshToken(tokenPayload);
-
-		await prisma.refreshToken.create({
-			data: {
-				token: refreshToken,
-				userId: user.id,
-				expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-			},
-		});
-
-		setAuthCookies(res, accessToken, refreshToken);
-
-		await prisma.user.update({
-			where: { id: user.id },
-			data: { lastSeen: new Date() },
-		});
+		setAuthCookies(res, result.accessToken, result.refreshToken);
 
 		res.status(200).json({
 			success: true,
 			message: 'Login successful',
 			data: {
-				user: {
-					username: user.username,
-					email: user.email,
-					id: user.id,
-				},
+				user: result.user,
 			},
 		});
 	} catch (error) {
+		if (error instanceof AuthServiceError) {
+			res.status(error.statusCode).json({
+				success: false,
+				message: error.message,
+			});
+			return;
+		}
+
 		console.error('Login error:', error);
 		res.status(500).json({
 			success: false,
@@ -176,34 +121,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
 			return;
 		}
 
-		let tokenPayload: TokenPayload;
-		try {
-			tokenPayload = verifyRefreshToken(refreshToken);
-		} catch (error) {
-			res.status(401).json({
-				success: false,
-				message: 'Invalid refresh token',
-			});
-			return;
-		}
-
-		const storedToken = await prisma.refreshToken.findUnique({
-			where: { token: refreshToken },
-			include: { user: true },
-		});
-
-		if (!storedToken || storedToken.expiresAt < new Date()) {
-			res.status(401).json({
-				success: false,
-				message: 'Refresh token expired or not found',
-			});
-			return;
-		}
-
-		const newAccessToken = generateAccessToken({
-			userId: storedToken.user.id,
-			email: storedToken.user.email,
-		});
+		const newAccessToken = await refreshAccessToken(refreshToken);
 
 		res.cookie('accessToken', newAccessToken, {
 			httpOnly: true,
@@ -217,6 +135,14 @@ export async function refresh(req: Request, res: Response): Promise<void> {
 			message: 'Access token refreshed successfully',
 		});
 	} catch (error) {
+		if (error instanceof AuthServiceError) {
+			res.status(error.statusCode).json({
+				success: false,
+				message: error.message,
+			});
+			return;
+		}
+
 		console.error('Refresh token error:', error);
 		res.status(500).json({
 			success: false,
@@ -234,9 +160,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
 		const { refreshToken } = req.cookies;
 
 		if (refreshToken) {
-			await prisma.refreshToken.deleteMany({
-				where: { token: refreshToken },
-			});
+			await logoutUser(refreshToken);
 		}
 
 		clearAuthCookies(res);
@@ -270,23 +194,7 @@ export async function me(req: Request, res: Response): Promise<void> {
 			return;
 		}
 
-		const user = await prisma.user.findUnique({
-			where: { id: userId },
-			select: {
-				email: true,
-				username: true,
-				createdAt: true,
-				lastSeen: true,
-			},
-		});
-
-		if (!user) {
-			res.status(404).json({
-				success: false,
-				message: 'User not found',
-			});
-			return;
-		}
+		const user = await getUserData(userId);
 
 		res.status(200).json({
 			success: true,
@@ -295,6 +203,14 @@ export async function me(req: Request, res: Response): Promise<void> {
 			},
 		});
 	} catch (error) {
+		if (error instanceof AuthServiceError) {
+			res.status(error.statusCode).json({
+				success: false,
+				message: error.message,
+			});
+			return;
+		}
+
 		console.error('Get user data error:', error);
 		res.status(500).json({
 			success: false,
