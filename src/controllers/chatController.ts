@@ -99,6 +99,17 @@ export async function deleteChat(req: Request, res: Response, next: NextFunction
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const chatId = req.params.id;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		await chatService.deleteChat(userId, chatId);
+
+		ResponseHelper.success(res, 'Chat deleted successfully');
 	} catch (error) {
 		next(error);
 	}
