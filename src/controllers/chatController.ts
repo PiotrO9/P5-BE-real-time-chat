@@ -74,6 +74,18 @@ export async function getChat(req: Request, res: Response, next: NextFunction) {
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const chatId = req.params.id;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		const chatService = new ChatService();
+		const chat = await chatService.getChatById(userId, chatId);
+
+		ResponseHelper.success(res, 'Chat retrieved successfully', chat);
 	} catch (error) {
 		next(error);
 	}

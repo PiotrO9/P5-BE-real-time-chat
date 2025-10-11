@@ -432,7 +432,7 @@ export class ChatService {
 	/**
 	 * Gets a specific chat by ID
 	 */
-	private async getChatById(userId: string, chatId: string): Promise<ChatResponse> {
+	async getChatById(userId: string, chatId: string): Promise<ChatResponse> {
 		const chatUser = await prisma.chatUser.findFirst({
 			where: {
 				userId,
