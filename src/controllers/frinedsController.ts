@@ -246,7 +246,97 @@ export async function inviteFriend(req: Request, res: Response, next: NextFuncti
 
 export async function getInvites(req: Request, res: Response, next: NextFunction) {
     try {
-        const userId = req.params.id;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: 'Brak autoryzacji użytkownika'
+            });
+            return;
+        }
+
+        // Pobierz wszystkie zaproszenia dla użytkownika (wysłane i otrzymane)
+        const invites = await prisma.friendInvite.findMany({
+            where: {
+                OR: [
+                    { senderId: userId },
+                    { receiverId: userId }
+                ],
+                deletedAt: null
+            },
+            include: {
+                sender: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true,
+                        isOnline: true,
+                        lastSeen: true,
+                        createdAt: true
+                    }
+                },
+                receiver: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true,
+                        isOnline: true,
+                        lastSeen: true,
+                        createdAt: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        // Podziel zaproszenia na wysłane i otrzymane
+        const sentInvites = invites
+            .filter(invite => invite.senderId === userId)
+            .map(invite => ({
+                id: invite.id,
+                status: invite.status,
+                createdAt: invite.createdAt,
+                receiver: {
+                    id: invite.receiver.id,
+                    username: invite.receiver.username,
+                    email: invite.receiver.email,
+                    isOnline: invite.receiver.isOnline,
+                    lastSeen: invite.receiver.lastSeen,
+                    createdAt: invite.receiver.createdAt
+                }
+            }));
+
+        const receivedInvites = invites
+            .filter(invite => invite.receiverId === userId)
+            .map(invite => ({
+                id: invite.id,
+                status: invite.status,
+                createdAt: invite.createdAt,
+                sender: {
+                    id: invite.sender.id,
+                    username: invite.sender.username,
+                    email: invite.sender.email,
+                    isOnline: invite.sender.isOnline,
+                    lastSeen: invite.sender.lastSeen,
+                    createdAt: invite.sender.createdAt
+                }
+            }));
+
+        res.status(200).json({
+            success: true,
+            message: 'Zaproszenia pobrane pomyślnie',
+            data: {
+                sentInvites,
+                receivedInvites,
+                totalSent: sentInvites.length,
+                totalReceived: receivedInvites.length,
+                totalPending: receivedInvites.filter(invite => invite.status === 'PENDING').length
+            }
+        });
+
     } catch (error) {
         next(error);
         return;
