@@ -5,6 +5,10 @@ import { ResponseHelper } from '../utils/responseHelper';
 
 const friendsService = new FriendsService();
 
+/**
+ * Get all friends for current user
+ * GET /api/friends
+ */
 export async function getFriends(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -25,6 +29,10 @@ export async function getFriends(req: Request, res: Response, next: NextFunction
 	}
 }
 
+/**
+ * Send friend invitation by username
+ * POST /api/friends/invite
+ */
 export async function inviteFriend(req: Request, res: Response, next: NextFunction) {
 	try {
 		const senderId = req.user?.userId;
@@ -66,6 +74,10 @@ export async function inviteFriend(req: Request, res: Response, next: NextFuncti
 	}
 }
 
+/**
+ * Get all pending friend invitations
+ * GET /api/friends/invites
+ */
 export async function getInvites(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -83,6 +95,10 @@ export async function getInvites(req: Request, res: Response, next: NextFunction
 	}
 }
 
+/**
+ * Accept friend invitation
+ * POST /api/friends/invites/:id/accept
+ */
 export async function acceptInvite(req: Request, res: Response, next: NextFunction) {
 	try {
 		const currentUserId = req.user?.userId;
@@ -117,6 +133,10 @@ export async function acceptInvite(req: Request, res: Response, next: NextFuncti
 	}
 }
 
+/**
+ * Reject friend invitation
+ * POST /api/friends/invites/:id/reject
+ */
 export async function rejectInvite(req: Request, res: Response, next: NextFunction) {
 	try {
 		const currentUserId = req.user?.userId;
@@ -151,6 +171,10 @@ export async function rejectInvite(req: Request, res: Response, next: NextFuncti
 	}
 }
 
+/**
+ * Remove friend from friend list
+ * DELETE /api/friends/:friendId
+ */
 export async function deleteFriend(req: Request, res: Response, next: NextFunction) {
 	try {
 		const currentUserId = req.user?.userId;

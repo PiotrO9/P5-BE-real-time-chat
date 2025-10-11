@@ -5,6 +5,10 @@ import { updatePasswordSchema } from '../utils/validationSchemas';
 
 const prisma = new PrismaClient();
 
+/**
+ * Get user profile by ID
+ * GET /api/users/:id
+ */
 export async function getUserProfile(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
@@ -36,6 +40,10 @@ export async function getUserProfile(req: Request, res: Response, next: NextFunc
 	}
 }
 
+/**
+ * Get all users with pagination
+ * GET /api/users
+ */
 export async function getAllUsers(req: Request, res: Response, next: NextFunction) {
 	try {
 		const page = parseInt(req.query.page as string) || 1;
@@ -76,6 +84,10 @@ export async function getAllUsers(req: Request, res: Response, next: NextFunctio
 	}
 }
 
+/**
+ * Update user profile (username or email)
+ * PUT /api/users/:id
+ */
 export async function updateUserProfile(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
@@ -147,6 +159,10 @@ export async function updateUserProfile(req: Request, res: Response, next: NextF
 	}
 }
 
+/**
+ * Soft delete user (set deletedAt)
+ * DELETE /api/users/:id
+ */
 export async function deleteUser(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
@@ -177,6 +193,10 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
 	}
 }
 
+/**
+ * Get user online status
+ * GET /api/users/:id/status
+ */
 export async function getUserStatus(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
@@ -200,6 +220,10 @@ export async function getUserStatus(req: Request, res: Response, next: NextFunct
 	}
 }
 
+/**
+ * Update user password
+ * PUT /api/users/:id/password
+ */
 export async function updateUserPassword(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.params.id;
