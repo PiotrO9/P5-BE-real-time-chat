@@ -63,3 +63,10 @@ export const updateChatSchema = z.object({
 		.min(1, 'Chat name is required')
 		.max(100, 'Chat name must be less than 100 characters'),
 });
+
+export const addChatMembersSchema = z.object({
+	userIds: z
+		.array(z.string().uuid('Invalid user ID'))
+		.min(1, 'At least one user ID is required')
+		.max(50, 'Cannot add more than 50 users at once'),
+});

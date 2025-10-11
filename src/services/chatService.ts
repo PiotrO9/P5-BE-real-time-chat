@@ -752,4 +752,113 @@ export class ChatService {
 		const updatedChat = await this.getChatById(userId, chatId);
 		return updatedChat;
 	}
+
+	/**
+	 * Adds members to a group chat
+	 * Only OWNER or MODERATOR can add members
+	 */
+	async addChatMembers(userId: string, chatId: string, userIds: string[]): Promise<ChatResponse> {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+			include: {
+				chat: {
+					include: {
+						chatUsers: {
+							where: {
+								deletedAt: null,
+							},
+						},
+					},
+				},
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if it's a group chat
+		if (!chatUser.chat.isGroup) {
+			throw new Error('Cannot add members to 1-on-1 chat');
+		}
+
+		// Check if user has permission to add members (must be OWNER or MODERATOR)
+		if (chatUser.role !== ChatRole.OWNER && chatUser.role !== ChatRole.MODERATOR) {
+			throw new Error('Only chat owner or moderator can add members');
+		}
+
+		// Remove duplicates and current user from userIds
+		const uniqueUserIds = [...new Set(userIds.filter(id => id !== userId))];
+
+		if (uniqueUserIds.length === 0) {
+			throw new Error('No valid users to add');
+		}
+
+		// Check if users exist
+		const users = await prisma.user.findMany({
+			where: {
+				id: { in: uniqueUserIds },
+				deletedAt: null,
+			},
+		});
+
+		if (users.length !== uniqueUserIds.length) {
+			throw new Error('Some users not found');
+		}
+
+		// Check if users are friends with the person adding them
+		const friendships = await prisma.friendship.findMany({
+			where: {
+				OR: [
+					{
+						requesterId: userId,
+						addresseeId: { in: uniqueUserIds },
+						deletedAt: null,
+					},
+					{
+						requesterId: { in: uniqueUserIds },
+						addresseeId: userId,
+						deletedAt: null,
+					},
+				],
+			},
+		});
+
+		const friendIds = new Set(
+			friendships.map(f => (f.requesterId === userId ? f.addresseeId : f.requesterId)),
+		);
+
+		const nonFriends = uniqueUserIds.filter(id => !friendIds.has(id));
+
+		if (nonFriends.length > 0) {
+			throw new Error('You can only add friends to group chats');
+		}
+
+		// Check if users are already members of the chat
+		const currentMemberIds = new Set(chatUser.chat.chatUsers.map(cu => cu.userId));
+		const newUserIds = uniqueUserIds.filter(id => !currentMemberIds.has(id));
+
+		if (newUserIds.length === 0) {
+			throw new Error('All users are already members of this chat');
+		}
+
+		// Add new members to the chat
+		await prisma.chatUser.createMany({
+			data: newUserIds.map(newUserId => ({
+				chatId: chatId,
+				userId: newUserId,
+				role: ChatRole.USER,
+				createdBy: userId,
+			})),
+		});
+
+		// Return updated chat
+		const updatedChat = await this.getChatById(userId, chatId);
+		return updatedChat;
+	}
 }
