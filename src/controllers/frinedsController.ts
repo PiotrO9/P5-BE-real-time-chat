@@ -583,7 +583,96 @@ export async function rejectInvite(req: Request, res: Response, next: NextFuncti
 
 export async function deleteFriend(req: Request, res: Response, next: NextFunction) {
     try {
-        const userId = req.params.id;
+        const currentUserId = req.user?.userId;
+        const friendId = req.params.friendId;
+
+        if (!currentUserId) {
+            res.status(401).json({
+                success: false,
+                message: 'Brak autoryzacji użytkownika'
+            });
+            return;
+        }
+
+        if (!friendId) {
+            res.status(400).json({
+                success: false,
+                message: 'Brak ID znajomego'
+            });
+            return;
+        }
+
+        // Sprawdź czy użytkownik nie próbuje usunąć samego siebie
+        if (currentUserId === friendId) {
+            res.status(400).json({
+                success: false,
+                message: 'Nie możesz usunąć samego siebie z listy znajomych'
+            });
+            return;
+        }
+
+        // Znajdź znajomość między użytkownikami
+        const friendship = await prisma.friendship.findFirst({
+            where: {
+                OR: [
+                    { requesterId: currentUserId, addresseeId: friendId },
+                    { requesterId: friendId, addresseeId: currentUserId }
+                ],
+                deletedAt: null
+            },
+            include: {
+                requester: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true
+                    }
+                },
+                addressee: {
+                    select: {
+                        id: true,
+                        username: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (!friendship) {
+            res.status(404).json({
+                success: false,
+                message: 'Znajomość nie została znaleziona'
+            });
+            return;
+        }
+
+        // Wykonaj soft delete znajomości
+        await prisma.friendship.update({
+            where: { id: friendship.id },
+            data: {
+                deletedAt: new Date(),
+                updatedBy: currentUserId
+            }
+        });
+
+        // Określ który użytkownik został usunięty jako znajomy
+        const deletedFriend = friendship.requesterId === currentUserId 
+            ? friendship.addressee 
+            : friendship.requester;
+
+        res.status(200).json({
+            success: true,
+            message: `Usunięto ${deletedFriend.username} z listy znajomych`,
+            data: {
+                deletedFriend: {
+                    id: deletedFriend.id,
+                    username: deletedFriend.username,
+                    email: deletedFriend.email
+                },
+                deletedAt: new Date()
+            }
+        });
+
     } catch (error) {
         next(error);
         return;
