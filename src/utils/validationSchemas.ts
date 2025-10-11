@@ -70,3 +70,10 @@ export const addChatMembersSchema = z.object({
 		.min(1, 'At least one user ID is required')
 		.max(50, 'Cannot add more than 50 users at once'),
 });
+
+export const removeChatMembersSchema = z.object({
+	userIds: z
+		.array(z.string().uuid('Invalid user ID'))
+		.min(1, 'At least one user ID is required')
+		.max(50, 'Cannot remove more than 50 users at once'),
+});

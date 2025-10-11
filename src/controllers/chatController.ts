@@ -5,6 +5,7 @@ import {
 	createChatSchema,
 	updateChatSchema,
 	addChatMembersSchema,
+	removeChatMembersSchema,
 } from '../utils/validationSchemas';
 import { ZodError } from 'zod';
 
@@ -206,6 +207,33 @@ export async function removeChatMembers(req: Request, res: Response, next: NextF
 		if (!userId) {
 			ResponseHelper.unauthorized(res);
 			return;
+		}
+
+		const chatId = req.params.id;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		// Validate request body
+		try {
+			const validatedData = removeChatMembersSchema.parse(req.body);
+
+			// Remove members from chat
+			const updatedChat = await chatService.removeChatMembers(userId, chatId, validatedData.userIds);
+
+			ResponseHelper.success(res, 'Members removed successfully', updatedChat);
+		} catch (error) {
+			if (error instanceof ZodError) {
+				const errors = error.issues.map((err: any) => ({
+					field: err.path.join('.'),
+					message: err.message,
+				}));
+				ResponseHelper.error(res, 'Validation failed', 400, errors);
+				return;
+			}
+			throw error;
 		}
 	} catch (error) {
 		next(error);

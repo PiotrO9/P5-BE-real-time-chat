@@ -19,7 +19,7 @@ router.get('/:id', authenticateToken, getChat);
 router.delete('/:id', authenticateToken, deleteChat);
 router.patch('/:id', authenticateToken, updateChat);
 router.post('/:id/members', authenticateToken, addChatMembers);
-router.delete('/:id/members/:userId', authenticateToken, removeChatMembers);
+router.delete('/:id/members', authenticateToken, removeChatMembers);
 router.patch('/:id/members/:userId/role', authenticateToken, updateChatMembersRole);
 
 export { router as chatRoutes };

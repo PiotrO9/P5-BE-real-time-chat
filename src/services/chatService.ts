@@ -861,4 +861,113 @@ export class ChatService {
 		const updatedChat = await this.getChatById(userId, chatId);
 		return updatedChat;
 	}
+
+	/**
+	 * Removes members from a group chat
+	 * Only OWNER or MODERATOR can remove members
+	 * MODERATOR can only remove USER role members
+	 * OWNER can remove USER or MODERATOR role members
+	 * Cannot remove OWNER or yourself
+	 */
+	async removeChatMembers(userId: string, chatId: string, userIds: string[]): Promise<ChatResponse> {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+			include: {
+				chat: {
+					include: {
+						chatUsers: {
+							where: {
+								deletedAt: null,
+							},
+						},
+					},
+				},
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if it's a group chat
+		if (!chatUser.chat.isGroup) {
+			throw new Error('Cannot remove members from 1-on-1 chat');
+		}
+
+		// Check if user has permission to remove members (must be OWNER or MODERATOR)
+		if (chatUser.role !== ChatRole.OWNER && chatUser.role !== ChatRole.MODERATOR) {
+			throw new Error('Only chat owner or moderator can remove members');
+		}
+
+		// Remove duplicates and current user from userIds
+		const uniqueUserIds = [...new Set(userIds.filter(id => id !== userId))];
+
+		if (uniqueUserIds.length === 0) {
+			throw new Error('Cannot remove yourself. Use delete chat to leave the group');
+		}
+
+		// Check if users exist
+		const users = await prisma.user.findMany({
+			where: {
+				id: { in: uniqueUserIds },
+				deletedAt: null,
+			},
+		});
+
+		if (users.length !== uniqueUserIds.length) {
+			throw new Error('Some users not found');
+		}
+
+		// Get chat users to remove
+		const chatUsersToRemove = await prisma.chatUser.findMany({
+			where: {
+				chatId,
+				userId: { in: uniqueUserIds },
+				deletedAt: null,
+			},
+		});
+
+		if (chatUsersToRemove.length === 0) {
+			throw new Error('No valid members to remove');
+		}
+
+		// Check if trying to remove members who are not in the chat
+		if (chatUsersToRemove.length !== uniqueUserIds.length) {
+			throw new Error('Some users are not members of this chat');
+		}
+
+		// Check if trying to remove OWNER
+		const ownerToRemove = chatUsersToRemove.find(cu => cu.role === ChatRole.OWNER);
+		if (ownerToRemove) {
+			throw new Error('Cannot remove chat owner');
+		}
+
+		// If current user is MODERATOR, check if trying to remove another MODERATOR
+		if (chatUser.role === ChatRole.MODERATOR) {
+			const moderatorToRemove = chatUsersToRemove.find(cu => cu.role === ChatRole.MODERATOR);
+			if (moderatorToRemove) {
+				throw new Error('Moderator cannot remove other moderators');
+			}
+		}
+
+		// Remove members from the chat (soft delete)
+		await prisma.chatUser.updateMany({
+			where: {
+				id: { in: chatUsersToRemove.map(cu => cu.id) },
+			},
+			data: {
+				deletedAt: new Date(),
+				updatedBy: userId,
+			},
+		});
+
+		// Return updated chat
+		const updatedChat = await this.getChatById(userId, chatId);
+		return updatedChat;
+	}
 }
