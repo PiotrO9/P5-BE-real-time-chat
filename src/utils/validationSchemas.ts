@@ -28,3 +28,7 @@ export const updatePasswordSchema = z.object({
 		.regex(/[0-9]/, 'New password must contain at least one number')
 		.regex(/[^a-zA-Z0-9]/, 'New password must contain at least one special character'),
 });
+
+export const inviteFriendSchema = z.object({
+	username: z.string().min(1, 'Username is required'),
+});
