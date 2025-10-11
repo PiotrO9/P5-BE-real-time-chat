@@ -970,4 +970,110 @@ export class ChatService {
 		const updatedChat = await this.getChatById(userId, chatId);
 		return updatedChat;
 	}
+
+	/**
+	 * Updates a member's role in a group chat
+	 * Only OWNER can change roles
+	 * Cannot change own role
+	 * If promoting someone to OWNER, current OWNER becomes MODERATOR
+	 */
+	async updateChatMemberRole(
+		userId: string,
+		chatId: string,
+		targetUserId: string,
+		newRole: ChatRole,
+	): Promise<ChatResponse> {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+			include: {
+				chat: {
+					include: {
+						chatUsers: {
+							where: {
+								deletedAt: null,
+							},
+						},
+					},
+				},
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if it's a group chat
+		if (!chatUser.chat.isGroup) {
+			throw new Error('Cannot change roles in 1-on-1 chat');
+		}
+
+		// Check if user has permission to change roles (must be OWNER)
+		if (chatUser.role !== ChatRole.OWNER) {
+			throw new Error('Only chat owner can change member roles');
+		}
+
+		// Cannot change own role
+		if (userId === targetUserId) {
+			throw new Error('Cannot change your own role');
+		}
+
+		// Check if target user is a member of the chat
+		const targetChatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId: targetUserId,
+				chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!targetChatUser) {
+			throw new Error('Target user is not a member of this chat');
+		}
+
+		// If promoting to OWNER, demote current OWNER to MODERATOR
+		if (newRole === ChatRole.OWNER) {
+			await prisma.$transaction([
+				// Demote current OWNER to MODERATOR
+				prisma.chatUser.update({
+					where: {
+						id: chatUser.id,
+					},
+					data: {
+						role: ChatRole.MODERATOR,
+						updatedBy: userId,
+					},
+				}),
+				// Promote target user to OWNER
+				prisma.chatUser.update({
+					where: {
+						id: targetChatUser.id,
+					},
+					data: {
+						role: newRole,
+						updatedBy: userId,
+					},
+				}),
+			]);
+		} else {
+			// Update target user's role
+			await prisma.chatUser.update({
+				where: {
+					id: targetChatUser.id,
+				},
+				data: {
+					role: newRole,
+					updatedBy: userId,
+				},
+			});
+		}
+
+		// Return updated chat
+		const updatedChat = await this.getChatById(userId, chatId);
+		return updatedChat;
+	}
 }

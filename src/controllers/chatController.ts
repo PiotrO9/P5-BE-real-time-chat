@@ -6,6 +6,7 @@ import {
 	updateChatSchema,
 	addChatMembersSchema,
 	removeChatMembersSchema,
+	updateChatMemberRoleSchema,
 } from '../utils/validationSchemas';
 import { ZodError } from 'zod';
 
@@ -247,6 +248,44 @@ export async function updateChatMembersRole(req: Request, res: Response, next: N
 		if (!userId) {
 			ResponseHelper.unauthorized(res);
 			return;
+		}
+
+		const chatId = req.params.id;
+		const targetUserId = req.params.userId;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		if (!targetUserId) {
+			ResponseHelper.error(res, 'User ID is required', 400);
+			return;
+		}
+
+		// Validate request body
+		try {
+			const validatedData = updateChatMemberRoleSchema.parse(req.body);
+
+			// Update member role
+			const updatedChat = await chatService.updateChatMemberRole(
+				userId,
+				chatId,
+				targetUserId,
+				validatedData.role as any,
+			);
+
+			ResponseHelper.success(res, 'Member role updated successfully', updatedChat);
+		} catch (error) {
+			if (error instanceof ZodError) {
+				const errors = error.issues.map((err: any) => ({
+					field: err.path.join('.'),
+					message: err.message,
+				}));
+				ResponseHelper.error(res, 'Validation failed', 400, errors);
+				return;
+			}
+			throw error;
 		}
 	} catch (error) {
 		next(error);
