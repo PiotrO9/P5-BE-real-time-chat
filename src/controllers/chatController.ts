@@ -96,6 +96,10 @@ export async function createChat(req: Request, res: Response, next: NextFunction
 	}
 }
 
+/**
+ * Get a specific chat by ID
+ * GET /api/chats/:id
+ */
 export async function getChat(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -121,6 +125,10 @@ export async function getChat(req: Request, res: Response, next: NextFunction) {
 	}
 }
 
+/**
+ * Delete a chat by ID
+ * DELETE /api/chats/:id
+ */
 export async function deleteChat(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -145,6 +153,10 @@ export async function deleteChat(req: Request, res: Response, next: NextFunction
 	}
 }
 
+/**
+ * Update a chat by ID
+ * PATCH /api/chats/:id
+ */
 export async function updateChat(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -188,6 +200,10 @@ export async function updateChat(req: Request, res: Response, next: NextFunction
 	}
 }
 
+/**
+ * Add members to a chat
+ * POST /api/chats/:id/members
+ */
 export async function addChatMembers(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -243,6 +259,10 @@ export async function addChatMembers(req: Request, res: Response, next: NextFunc
 	}
 }
 
+/**
+ * Remove members from a chat
+ * DELETE /api/chats/:id/members
+ */
 export async function removeChatMembers(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -288,6 +308,10 @@ export async function removeChatMembers(req: Request, res: Response, next: NextF
 	}
 }
 
+/**
+ * Update a chat member's role
+ * PATCH /api/chats/:id/members/:userId/role
+ */
 export async function updateChatMembersRole(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;

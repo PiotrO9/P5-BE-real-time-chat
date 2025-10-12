@@ -20,6 +20,10 @@ import { PrismaClient } from '@prisma/client';
 const messageService = new MessageService();
 const prisma = new PrismaClient();
 
+/**
+ * Get all messages for a specific chat
+ * GET /api/messages/:chatId/messages
+ */
 export async function getMessages(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -61,6 +65,10 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
 	}
 }
 
+/**
+ * Send a new message to a chat
+ * POST /api/messages/:chatId/messages
+ */
 export async function sendMessage(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -109,6 +117,10 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
 	}
 }
 
+/**
+ * Edit a message by ID
+ * PATCH /api/messages/:messageId
+ */
 export async function editMessage(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -153,6 +165,10 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
 	}
 }
 
+/**
+ * Delete a message by ID
+ * DELETE /api/messages/:messageId
+ */
 export async function deleteMessage(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -196,6 +212,10 @@ export async function deleteMessage(req: Request, res: Response, next: NextFunct
 	}
 }
 
+/**
+ * Get all replies for a specific message
+ * GET /api/messages/:messageId/replies
+ */
 export async function getMessageReplies(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -226,6 +246,10 @@ export async function getMessageReplies(req: Request, res: Response, next: NextF
 	}
 }
 
+/**
+ * Add a reaction to a message
+ * POST /api/messages/:messageId/reactions
+ */
 export async function addMessageReaction(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -295,6 +319,10 @@ export async function addMessageReaction(req: Request, res: Response, next: Next
 	}
 }
 
+/**
+ * Remove a reaction from a message
+ * DELETE /api/messages/:messageId/reactions/:emoji
+ */
 export async function deleteMessageReaction(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -335,6 +363,10 @@ export async function deleteMessageReaction(req: Request, res: Response, next: N
 	}
 }
 
+/**
+ * Mark a message as read
+ * POST /api/messages/:messageId/read
+ */
 export async function markMessageAsRead(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
@@ -385,6 +417,10 @@ export async function markMessageAsRead(req: Request, res: Response, next: NextF
 	}
 }
 
+/**
+ * Get all users who have read a message
+ * GET /api/messages/:messageId/readers
+ */
 export async function getMessageReaders(req: Request, res: Response, next: NextFunction) {
 	try {
 		const userId = req.user?.userId;
