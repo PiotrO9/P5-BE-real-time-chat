@@ -8,20 +8,22 @@ import {
 	getMessageReplies,
 	addMessageReaction,
 	deleteMessageReaction,
+	markMessageAsRead,
+	getMessageReaders,
 } from '../controllers/messagesController';
 
 const router = Router();
 
 router.get('/:chatId/messages', authenticateToken, getMessages);
 router.post('/:chatId/messages', authenticateToken, sendMessage);
-router.patch('/:id', authenticateToken, editMessage);
-router.delete('/:id', authenticateToken, deleteMessage);
-router.get('/:id/replies', authenticateToken, getMessageReplies);
+router.patch('/:messageId', authenticateToken, editMessage);
+router.delete('/:messageId', authenticateToken, deleteMessage);
+router.get('/:messageId/replies', authenticateToken, getMessageReplies);
 
-router.post('/:id/reactions', authenticateToken, addMessageReaction);
-router.delete('/:id/reactions', authenticateToken, deleteMessageReaction);
+router.post('/:messageId/reactions', authenticateToken, addMessageReaction);
+router.delete('/:messageId/reactions', authenticateToken, deleteMessageReaction);
 
-router.post('/:id/read', authenticateToken, markMessageAsRead);
-router.get('/:id/readers', authenticateToken, getMessageReaders);
+router.post('/:messageId/read', authenticateToken, markMessageAsRead);
+router.get('/:messageId/readers', authenticateToken, getMessageReaders);
 
 export { router as messagesRoutes };

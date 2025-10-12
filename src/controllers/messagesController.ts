@@ -103,7 +103,35 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const { messageId } = req.params;
+
+		// Validate request body
+		const bodyValidation = editMessageSchema.safeParse(req.body);
+
+		if (!bodyValidation.success) {
+			const errors = bodyValidation.error.issues.map((err: any) => ({
+				field: err.path.join('.'),
+				message: err.message,
+			}));
+
+			ResponseHelper.validationError(res, errors);
+			return;
+		}
+
+		const { content } = bodyValidation.data;
+
+		// Edit message
+		const message = await messageService.editMessage(userId, messageId, content);
+
+		ResponseHelper.success(res, 'Message updated successfully', message);
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Message not found or you are not the sender') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
 		next(error);
 	}
 }
@@ -116,7 +144,20 @@ export async function deleteMessage(req: Request, res: Response, next: NextFunct
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const { messageId } = req.params;
+
+		// Delete message
+		await messageService.deleteMessage(userId, messageId);
+
+		ResponseHelper.success(res, 'Message deleted successfully', null);
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Message not found or you are not the sender') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
 		next(error);
 	}
 }
