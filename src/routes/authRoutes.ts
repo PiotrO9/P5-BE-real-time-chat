@@ -4,14 +4,39 @@ import { authenticateToken, authenticateTokenWithoutRefresh } from '../middlewar
 
 const router = Router();
 
-// Public routes (no authentication required)
+/**
+ * @route POST /api/auth/register
+ * @desc Register a new user
+ * @access Public
+ */
 router.post('/register', register);
+
+/**
+ * @route POST /api/auth/login
+ * @desc Login user and get tokens
+ * @access Public
+ */
 router.post('/login', login);
+
+/**
+ * @route POST /api/auth/refresh
+ * @desc Refresh access token using refresh token
+ * @access Public
+ */
 router.post('/refresh', refresh);
+
+/**
+ * @route POST /api/auth/logout
+ * @desc Logout user and invalidate tokens
+ * @access Public
+ */
 router.post('/logout', logout);
 
-// Protected routes (authentication required)
-// Using authenticateToken with sliding session - refreshes token on each successful call
+/**
+ * @route GET /api/auth/me
+ * @desc Get current authenticated user's information
+ * @access Private
+ */
 router.get('/me', authenticateToken, me);
 
 // Example: If you want to use authentication WITHOUT sliding session for specific endpoints:

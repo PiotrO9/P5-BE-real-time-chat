@@ -7,7 +7,11 @@ import { messagesRoutes } from './messagesRoutes';
 
 const router = Router();
 
-// Health check endpoint
+/**
+ * @route GET /api/health
+ * @desc Health check endpoint for API status
+ * @access Public
+ */
 router.get('/health', (req: Request, res: Response) => {
 	res.json({
 		status: 'OK',
