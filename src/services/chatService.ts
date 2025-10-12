@@ -587,9 +587,9 @@ export class ChatService {
 	}
 
 	/**
-	 * Deletes a chat for a user (soft delete)
-	 * For 1-on-1 chats: removes user from chat
-	 * For group chats: removes user from chat, if last member or owner, deletes entire chat
+	 * Deletes a chat (soft delete)
+	 * For 1-on-1 chats: any user can delete it (removes them from chat)
+	 * For group chats: only OWNER can delete the entire chat for all members
 	 */
 	async deleteChat(userId: string, chatId: string): Promise<void> {
 		// Check if user is a member of this chat
@@ -617,7 +617,6 @@ export class ChatService {
 		}
 
 		const chat = chatUser.chat;
-		const activeMembersCount = chat.chatUsers.length;
 
 		// If it's a 1-on-1 chat, just soft delete the chatUser
 		if (!chat.isGroup) {
@@ -633,77 +632,35 @@ export class ChatService {
 			return;
 		}
 
-		// For group chats
-		// If user is the last member or the only member left, delete the entire chat
-		if (activeMembersCount === 1) {
-			await prisma.$transaction([
-				// Soft delete all chat users
-				prisma.chatUser.updateMany({
-					where: {
-						chatId,
-						deletedAt: null,
-					},
-					data: {
-						deletedAt: new Date(),
-						updatedBy: userId,
-					},
-				}),
-				// Soft delete the chat
-				prisma.chat.update({
-					where: {
-						id: chatId,
-					},
-					data: {
-						deletedAt: new Date(),
-						updatedBy: userId,
-					},
-				}),
-			]);
-			return;
+		// For group chats - only OWNER can delete the entire chat
+		if (chatUser.role !== ChatRole.OWNER) {
+			throw new Error('Only chat owner can delete group chats');
 		}
 
-		// If user is OWNER and there are other members
-		if (chatUser.role === ChatRole.OWNER) {
-			// Find another member to promote to owner
-			const newOwner = chat.chatUsers.find(cu => cu.userId !== userId && cu.deletedAt === null);
-
-			if (newOwner) {
-				await prisma.$transaction([
-					// Promote new owner
-					prisma.chatUser.update({
-						where: {
-							id: newOwner.id,
-						},
-						data: {
-							role: ChatRole.OWNER,
-							updatedBy: userId,
-						},
-					}),
-					// Remove current user from chat
-					prisma.chatUser.update({
-						where: {
-							id: chatUser.id,
-						},
-						data: {
-							deletedAt: new Date(),
-							updatedBy: userId,
-						},
-					}),
-				]);
-				return;
-			}
-		}
-
-		// If user is not owner or owner role was transferred, just remove user from chat
-		await prisma.chatUser.update({
-			where: {
-				id: chatUser.id,
-			},
-			data: {
-				deletedAt: new Date(),
-				updatedBy: userId,
-			},
-		});
+		// Delete entire group chat (soft delete all members and the chat itself)
+		await prisma.$transaction([
+			// Soft delete all chat users
+			prisma.chatUser.updateMany({
+				where: {
+					chatId,
+					deletedAt: null,
+				},
+				data: {
+					deletedAt: new Date(),
+					updatedBy: userId,
+				},
+			}),
+			// Soft delete the chat
+			prisma.chat.update({
+				where: {
+					id: chatId,
+				},
+				data: {
+					deletedAt: new Date(),
+					updatedBy: userId,
+				},
+			}),
+		]);
 	}
 
 	/**
