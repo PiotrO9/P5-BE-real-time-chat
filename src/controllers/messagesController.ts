@@ -5,6 +5,7 @@ import {
 	getMessagesQuerySchema,
 	sendMessageSchema,
 	editMessageSchema,
+	addMessageReactionSchema,
 } from '../utils/validationSchemas';
 
 const messageService = new MessageService();
@@ -170,7 +171,24 @@ export async function getMessageReplies(req: Request, res: Response, next: NextF
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const { messageId } = req.params;
+
+		// Get replies from the service
+		const replies = await messageService.getMessageReplies(userId, messageId);
+
+		ResponseHelper.success(res, 'Message replies retrieved successfully', replies);
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Message not found') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
 		next(error);
 	}
 }
@@ -183,7 +201,43 @@ export async function addMessageReaction(req: Request, res: Response, next: Next
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const { messageId } = req.params;
+
+		// Validate request body
+		const bodyValidation = addMessageReactionSchema.safeParse(req.body);
+
+		if (!bodyValidation.success) {
+			const errors = bodyValidation.error.issues.map((err: any) => ({
+				field: err.path.join('.'),
+				message: err.message,
+			}));
+
+			ResponseHelper.validationError(res, errors);
+			return;
+		}
+
+		const { emoji } = bodyValidation.data;
+
+		// Add reaction
+		await messageService.addMessageReaction(userId, messageId, emoji);
+
+		ResponseHelper.success(res, 'Reaction added successfully', null, 201);
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Message not found') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'You have already reacted with this emoji') {
+				ResponseHelper.validationError(res, [{ field: 'emoji', message: error.message }]);
+				return;
+			}
+		}
 		next(error);
 	}
 }
@@ -196,7 +250,20 @@ export async function deleteMessageReaction(req: Request, res: Response, next: N
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const { messageId, emoji } = req.params;
+
+		// Delete reaction
+		await messageService.deleteMessageReaction(userId, messageId, emoji);
+
+		ResponseHelper.success(res, 'Reaction deleted successfully', null);
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Reaction not found') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
 		next(error);
 	}
 }
@@ -209,7 +276,24 @@ export async function markMessageAsRead(req: Request, res: Response, next: NextF
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const { messageId } = req.params;
+
+		// Mark message as read
+		await messageService.markMessageAsRead(userId, messageId);
+
+		ResponseHelper.success(res, 'Message marked as read successfully', null);
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Message not found') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
 		next(error);
 	}
 }
@@ -222,7 +306,24 @@ export async function getMessageReaders(req: Request, res: Response, next: NextF
 			ResponseHelper.unauthorized(res);
 			return;
 		}
+
+		const { messageId } = req.params;
+
+		// Get message readers
+		const readers = await messageService.getMessageReaders(userId, messageId);
+
+		ResponseHelper.success(res, 'Message readers retrieved successfully', readers);
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Message not found') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
 		next(error);
 	}
 }

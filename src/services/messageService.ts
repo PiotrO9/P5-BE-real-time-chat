@@ -539,4 +539,221 @@ export class MessageService {
 			};
 		});
 	}
+
+	/**
+	 * Adds a reaction to a message
+	 */
+	async addMessageReaction(userId: string, messageId: string, emoji: string): Promise<void> {
+		// Check if message exists
+		const message = await prisma.message.findFirst({
+			where: {
+				id: messageId,
+				deletedAt: null,
+			},
+		});
+
+		if (!message) {
+			throw new Error('Message not found');
+		}
+
+		// Check if user is a member of the chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId: message.chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if reaction already exists
+		const existingReaction = await prisma.messageReaction.findFirst({
+			where: {
+				messageId,
+				userId,
+				emoji,
+			},
+		});
+
+		if (existingReaction) {
+			// If it was soft-deleted, restore it
+			if (existingReaction.deletedAt) {
+				await prisma.messageReaction.update({
+					where: {
+						id: existingReaction.id,
+					},
+					data: {
+						deletedAt: null,
+						updatedBy: userId,
+					},
+				});
+			} else {
+				throw new Error('You have already reacted with this emoji');
+			}
+		} else {
+			// Create new reaction
+			await prisma.messageReaction.create({
+				data: {
+					messageId,
+					userId,
+					emoji,
+					createdBy: userId,
+				},
+			});
+		}
+	}
+
+	/**
+	 * Removes a reaction from a message
+	 */
+	async deleteMessageReaction(userId: string, messageId: string, emoji: string): Promise<void> {
+		// Check if reaction exists
+		const reaction = await prisma.messageReaction.findFirst({
+			where: {
+				messageId,
+				userId,
+				emoji,
+				deletedAt: null,
+			},
+		});
+
+		if (!reaction) {
+			throw new Error('Reaction not found');
+		}
+
+		// Soft delete the reaction
+		await prisma.messageReaction.update({
+			where: {
+				id: reaction.id,
+			},
+			data: {
+				deletedAt: new Date(),
+				updatedBy: userId,
+			},
+		});
+	}
+
+	/**
+	 * Marks a message as read
+	 */
+	async markMessageAsRead(userId: string, messageId: string): Promise<void> {
+		// Check if message exists
+		const message = await prisma.message.findFirst({
+			where: {
+				id: messageId,
+				deletedAt: null,
+			},
+		});
+
+		if (!message) {
+			throw new Error('Message not found');
+		}
+
+		// Check if user is a member of the chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId: message.chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if read record already exists
+		const existingRead = await prisma.messageRead.findFirst({
+			where: {
+				messageId,
+				userId,
+			},
+		});
+
+		if (existingRead) {
+			// If it was soft-deleted, restore it
+			if (existingRead.deletedAt) {
+				await prisma.messageRead.update({
+					where: {
+						id: existingRead.id,
+					},
+					data: {
+						deletedAt: null,
+						readAt: new Date(),
+						updatedBy: userId,
+					},
+				});
+			}
+			// If already marked as read, do nothing
+		} else {
+			// Create new read record
+			await prisma.messageRead.create({
+				data: {
+					messageId,
+					userId,
+					createdBy: userId,
+				},
+			});
+		}
+	}
+
+	/**
+	 * Gets list of users who read a message
+	 */
+	async getMessageReaders(
+		userId: string,
+		messageId: string,
+	): Promise<{ userId: string; username: string; readAt: Date }[]> {
+		// Check if message exists
+		const message = await prisma.message.findFirst({
+			where: {
+				id: messageId,
+				deletedAt: null,
+			},
+		});
+
+		if (!message) {
+			throw new Error('Message not found');
+		}
+
+		// Check if user is a member of the chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId: message.chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Get all reads for this message
+		const reads = await prisma.messageRead.findMany({
+			where: {
+				messageId,
+				deletedAt: null,
+			},
+			include: {
+				user: {
+					select: {
+						username: true,
+					},
+				},
+			},
+			orderBy: {
+				readAt: 'desc',
+			},
+		});
+
+		return reads.map(read => ({
+			userId: read.userId,
+			username: read.user.username,
+			readAt: read.readAt,
+		}));
+	}
 }
