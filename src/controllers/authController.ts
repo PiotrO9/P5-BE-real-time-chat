@@ -9,6 +9,10 @@ import {
 	getUserData,
 } from '../services/authService';
 import { AuthServiceError } from '../types/auth';
+import { UserService } from '../services/userService';
+import { emitUserStatusChange } from '../socket/socketEmitters';
+
+const userService = new UserService();
 
 /**
  * Register new user
@@ -80,6 +84,15 @@ export async function login(req: Request, res: Response): Promise<void> {
 		const result = await loginUser(email, password);
 
 		setAuthCookies(res, result.accessToken, result.refreshToken);
+
+		// Set user status to online
+		try {
+			await userService.setUserOnline(result.user.id);
+			// Emit status change to all relevant users
+			emitUserStatusChange(result.user.id, true, new Date());
+		} catch (error) {
+			console.error('Error setting user online status:', error);
+		}
 
 		res.status(200).json({
 			success: true,
@@ -157,10 +170,22 @@ export async function refresh(req: Request, res: Response): Promise<void> {
  */
 export async function logout(req: Request, res: Response): Promise<void> {
 	try {
+		const userId = (req as any).user?.userId;
 		const { refreshToken } = req.cookies;
 
 		if (refreshToken) {
 			await logoutUser(refreshToken);
+		}
+
+		// Set user status to offline
+		if (userId) {
+			try {
+				await userService.setUserOffline(userId);
+				// Emit status change to all relevant users
+				emitUserStatusChange(userId, false, new Date());
+			} catch (error) {
+				console.error('Error setting user offline status:', error);
+			}
 		}
 
 		clearAuthCookies(res);

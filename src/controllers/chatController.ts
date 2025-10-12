@@ -9,8 +9,16 @@ import {
 	updateChatMemberRoleSchema,
 } from '../utils/validationSchemas';
 import { ZodError } from 'zod';
+import {
+	emitChatCreated,
+	emitChatUpdated,
+	emitMemberAdded,
+	emitMemberRemoved,
+} from '../socket/socketEmitters';
+import { PrismaClient } from '@prisma/client';
 
 const chatService = new ChatService();
+const prisma = new PrismaClient();
 
 /**
  * Get all chats for current user
@@ -54,6 +62,22 @@ export async function createChat(req: Request, res: Response, next: NextFunction
 
 			// Create chat
 			const chat = await chatService.createChat(userId, validatedData);
+
+			// Get all participant IDs for socket emission
+			const chatUsers = await prisma.chatUser.findMany({
+				where: {
+					chatId: chat.id,
+					deletedAt: null,
+				},
+				select: {
+					userId: true,
+				},
+			});
+
+			const participantIds = chatUsers.map(cu => cu.userId);
+
+			// Emit socket event to all participants
+			emitChatCreated(chat, participantIds);
 
 			ResponseHelper.success(res, 'Chat created successfully', chat, 201);
 		} catch (error) {
@@ -144,6 +168,9 @@ export async function updateChat(req: Request, res: Response, next: NextFunction
 			// Update chat
 			const updatedChat = await chatService.updateChat(userId, chatId, validatedData.name);
 
+			// Emit socket event to all chat members
+			emitChatUpdated(chatId, { name: validatedData.name });
+
 			ResponseHelper.success(res, 'Chat updated successfully', updatedChat);
 		} catch (error) {
 			if (error instanceof ZodError) {
@@ -184,6 +211,21 @@ export async function addChatMembers(req: Request, res: Response, next: NextFunc
 			// Add members to chat
 			const updatedChat = await chatService.addChatMembers(userId, chatId, validatedData.userIds);
 
+			// Emit socket event for each new member
+			for (const newUserId of validatedData.userIds) {
+				const user = await prisma.user.findUnique({
+					where: { id: newUserId },
+					select: { username: true },
+				});
+
+				if (user) {
+					emitMemberAdded(chatId, {
+						userId: newUserId,
+						username: user.username,
+					});
+				}
+			}
+
 			ResponseHelper.success(res, 'Members added successfully', updatedChat);
 		} catch (error) {
 			if (error instanceof ZodError) {
@@ -223,6 +265,11 @@ export async function removeChatMembers(req: Request, res: Response, next: NextF
 
 			// Remove members from chat
 			const updatedChat = await chatService.removeChatMembers(userId, chatId, validatedData.userIds);
+
+			// Emit socket event for each removed member
+			for (const removedUserId of validatedData.userIds) {
+				emitMemberRemoved(chatId, removedUserId);
+			}
 
 			ResponseHelper.success(res, 'Members removed successfully', updatedChat);
 		} catch (error) {

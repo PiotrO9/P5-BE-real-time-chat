@@ -7,8 +7,18 @@ import {
 	editMessageSchema,
 	addMessageReactionSchema,
 } from '../utils/validationSchemas';
+import {
+	emitNewMessage,
+	emitMessageUpdated,
+	emitMessageDeleted,
+	emitReactionAdded,
+	emitReactionRemoved,
+	emitMessageRead,
+} from '../socket/socketEmitters';
+import { PrismaClient } from '@prisma/client';
 
 const messageService = new MessageService();
+const prisma = new PrismaClient();
 
 export async function getMessages(req: Request, res: Response, next: NextFunction) {
 	try {
@@ -80,6 +90,9 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
 		// Send message
 		const message = await messageService.sendMessage(userId, chatId, content, replyToId);
 
+		// Emit socket event to all chat members
+		emitNewMessage(chatId, message);
+
 		ResponseHelper.success(res, 'Message sent successfully', message, 201);
 	} catch (error) {
 		if (error instanceof Error) {
@@ -125,6 +138,9 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
 		// Edit message
 		const message = await messageService.editMessage(userId, messageId, content);
 
+		// Emit socket event to all chat members
+		emitMessageUpdated(message.chatId, message);
+
 		ResponseHelper.success(res, 'Message updated successfully', message);
 	} catch (error) {
 		if (error instanceof Error) {
@@ -148,8 +164,25 @@ export async function deleteMessage(req: Request, res: Response, next: NextFunct
 
 		const { messageId } = req.params;
 
+		// Get message details before deletion (for chatId)
+		const message = await prisma.message.findFirst({
+			where: {
+				id: messageId,
+				senderId: userId,
+				deletedAt: null,
+			},
+			select: {
+				chatId: true,
+			},
+		});
+
 		// Delete message
 		await messageService.deleteMessage(userId, messageId);
+
+		// Emit socket event to all chat members
+		if (message) {
+			emitMessageDeleted(message.chatId, messageId);
+		}
 
 		ResponseHelper.success(res, 'Message deleted successfully', null);
 	} catch (error) {
@@ -222,6 +255,26 @@ export async function addMessageReaction(req: Request, res: Response, next: Next
 		// Add reaction
 		await messageService.addMessageReaction(userId, messageId, emoji);
 
+		// Get message and user details for socket event
+		const message = await prisma.message.findUnique({
+			where: { id: messageId },
+			select: { chatId: true },
+		});
+
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+			select: { username: true },
+		});
+
+		// Emit socket event to all chat members
+		if (message && user) {
+			emitReactionAdded(message.chatId, messageId, {
+				emoji,
+				userId,
+				username: user.username,
+			});
+		}
+
 		ResponseHelper.success(res, 'Reaction added successfully', null, 201);
 	} catch (error) {
 		if (error instanceof Error) {
@@ -253,8 +306,22 @@ export async function deleteMessageReaction(req: Request, res: Response, next: N
 
 		const { messageId, emoji } = req.params;
 
+		// Get message details before deletion
+		const message = await prisma.message.findUnique({
+			where: { id: messageId },
+			select: { chatId: true },
+		});
+
 		// Delete reaction
 		await messageService.deleteMessageReaction(userId, messageId, emoji);
+
+		// Emit socket event to all chat members
+		if (message) {
+			emitReactionRemoved(message.chatId, messageId, {
+				emoji,
+				userId,
+			});
+		}
 
 		ResponseHelper.success(res, 'Reaction deleted successfully', null);
 	} catch (error) {
@@ -281,6 +348,26 @@ export async function markMessageAsRead(req: Request, res: Response, next: NextF
 
 		// Mark message as read
 		await messageService.markMessageAsRead(userId, messageId);
+
+		// Get message and user details for socket event
+		const message = await prisma.message.findUnique({
+			where: { id: messageId },
+			select: { chatId: true },
+		});
+
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+			select: { username: true },
+		});
+
+		// Emit socket event to all chat members
+		if (message && user) {
+			emitMessageRead(message.chatId, messageId, {
+				userId,
+				username: user.username,
+				readAt: new Date(),
+			});
+		}
 
 		ResponseHelper.success(res, 'Message marked as read successfully', null);
 	} catch (error) {

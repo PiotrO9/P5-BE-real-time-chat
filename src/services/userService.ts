@@ -210,4 +210,30 @@ export class UserService {
 			data: { password: hashedNewPassword },
 		});
 	}
+
+	/**
+	 * Sets user status to online
+	 */
+	async setUserOnline(userId: string): Promise<void> {
+		await prisma.user.update({
+			where: { id: userId },
+			data: {
+				isOnline: true,
+				lastSeen: new Date(),
+			},
+		});
+	}
+
+	/**
+	 * Sets user status to offline
+	 */
+	async setUserOffline(userId: string): Promise<void> {
+		await prisma.user.update({
+			where: { id: userId },
+			data: {
+				isOnline: false,
+				lastSeen: new Date(),
+			},
+		});
+	}
 }
