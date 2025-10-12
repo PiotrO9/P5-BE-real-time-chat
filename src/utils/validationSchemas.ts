@@ -83,3 +83,35 @@ export const updateChatMemberRoleSchema = z.object({
 		message: 'Role must be USER, MODERATOR, or OWNER',
 	}),
 });
+
+export const sendMessageSchema = z.object({
+	content: z
+		.string()
+		.min(1, 'Message content is required')
+		.max(5000, 'Message content must be less than 5000 characters'),
+	replyToId: z.string().uuid('Invalid reply message ID').optional(),
+});
+
+export const editMessageSchema = z.object({
+	content: z
+		.string()
+		.min(1, 'Message content is required')
+		.max(5000, 'Message content must be less than 5000 characters'),
+});
+
+export const getMessagesQuerySchema = z.object({
+	limit: z
+		.string()
+		.optional()
+		.transform(val => (val ? parseInt(val, 10) : 50))
+		.refine(val => val > 0 && val <= 100, {
+			message: 'Limit must be between 1 and 100',
+		}),
+	offset: z
+		.string()
+		.optional()
+		.transform(val => (val ? parseInt(val, 10) : 0))
+		.refine(val => val >= 0, {
+			message: 'Offset must be 0 or greater',
+		}),
+});

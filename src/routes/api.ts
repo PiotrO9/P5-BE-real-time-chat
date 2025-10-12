@@ -3,6 +3,7 @@ import { userRoutes } from './userRoutes';
 import { authRoutes } from './authRoutes';
 import { friendsRoutes } from './friendsRoutes';
 import { chatRoutes } from './chatRoutes';
+import { messagesRoutes } from './messagesRoutes';
 
 const router = Router();
 
@@ -21,5 +22,6 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/friends', friendsRoutes);
 router.use('/chats', chatRoutes);
+router.use('/messages', messagesRoutes);
 
 export { router };
