@@ -22,8 +22,19 @@ app.use(
 	cors({
 		origin: process.env.CLIENT_URL || 'http://localhost:3000',
 		credentials: true,
-		methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-		allowedHeaders: ['Content-Type', 'Authorization'],
+		methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+		allowedHeaders: [
+			'Content-Type',
+			'Authorization',
+			'X-Requested-With',
+			'Accept',
+			'Origin',
+			'Access-Control-Request-Method',
+			'Access-Control-Request-Headers',
+		],
+		exposedHeaders: ['Set-Cookie'],
+		preflightContinue: false,
+		optionsSuccessStatus: 204,
 	}),
 );
 
@@ -37,7 +48,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 		cors: {
 			origin: process.env.CLIENT_URL || 'http://localhost:3000',
 			credentials: true,
-			methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+			methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 		},
 	},
 );

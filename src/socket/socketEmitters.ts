@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { MessageResponse } from '../services/messageService';
+import { MessageResponse } from '../types/message';
 import {
 	ClientToServerEvents,
 	ServerToClientEvents,
