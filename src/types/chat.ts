@@ -12,7 +12,7 @@ export interface LastMessage {
 	content: string;
 	senderId: string;
 	senderUsername: string;
-	createdAt: Date;
+	createdAt: string;
 	wasUpdated: boolean;
 }
 

@@ -81,7 +81,7 @@ export class ChatService {
 								content: chat.messages[0].content,
 								senderId: chat.messages[0].senderId,
 								senderUsername: chat.messages[0].sender.username,
-								createdAt: chat.messages[0].createdAt,
+								createdAt: chat.messages[0].createdAt.toISOString(),
 								wasUpdated: chat.messages[0].wasUpdated,
 						  }
 						: null;
@@ -135,9 +135,13 @@ export class ChatService {
 
 		// Sort chats by last message date (most recent first)
 		chats.sort((a, b) => {
-			const dateA = a.lastMessage?.createdAt || a.updatedAt;
-			const dateB = b.lastMessage?.createdAt || b.updatedAt;
-			return dateB.getTime() - dateA.getTime();
+			const dateA = a.lastMessage?.createdAt
+				? new Date(a.lastMessage.createdAt).getTime()
+				: a.updatedAt.getTime();
+			const dateB = b.lastMessage?.createdAt
+				? new Date(b.lastMessage.createdAt).getTime()
+				: b.updatedAt.getTime();
+			return dateB - dateA;
 		});
 
 		return {
@@ -494,7 +498,7 @@ export class ChatService {
 						content: chat.messages[0].content,
 						senderId: chat.messages[0].senderId,
 						senderUsername: chat.messages[0].sender.username,
-						createdAt: chat.messages[0].createdAt,
+						createdAt: chat.messages[0].createdAt.toISOString(),
 						wasUpdated: chat.messages[0].wasUpdated,
 				  }
 				: null;

@@ -4,6 +4,7 @@ import { authRoutes } from './authRoutes';
 import { friendsRoutes } from './friendsRoutes';
 import { chatRoutes } from './chatRoutes';
 import { messagesRoutes } from './messagesRoutes';
+import { seedRoutes } from './seedRoutes';
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/users', userRoutes);
 router.use('/friends', friendsRoutes);
 router.use('/chats', chatRoutes);
 router.use('/messages', messagesRoutes);
+router.use('/seed', seedRoutes);
 
 export { router };
