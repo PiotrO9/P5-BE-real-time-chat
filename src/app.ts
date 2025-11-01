@@ -4,6 +4,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
 import { router as apiRoutes } from './routes/api';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { initializeSocketHandlers } from './socket/socketHandlers';
@@ -68,6 +70,37 @@ app.get('/', (req: Request, res: Response) => {
 	});
 });
 
+const swaggerOptions = {
+	definition: {
+		openapi: '3.0.0',
+		info: {
+			title: 'API Docs',
+			version: '1.0.0',
+			description: 'Automatycznie generowana dokumentacja API',
+		},
+		servers: [
+			{
+				url: `http://localhost:${PORT}`,
+				description: 'Development server',
+			},
+		],
+		components: {
+			securitySchemes: {
+				BearerAuth: {
+					type: 'http',
+					scheme: 'bearer',
+					bearerFormat: 'JWT',
+					description: 'Wprowadź token JWT w formacie: Bearer {token}',
+				},
+			},
+		},
+	},
+	apis: ['./src/routes/*.ts'],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 app.use('/api', apiRoutes);
 
 app.use(notFoundHandler);
@@ -76,6 +109,7 @@ app.use(errorHandler);
 server.listen(PORT, () => {
 	console.log(`🚀 Server is running on http://localhost:${PORT}`);
 	console.log(`📚 API available at http://localhost:${PORT}/api`);
+	console.log(`📖 Swagger docs available at http://localhost:${PORT}/api/docs`);
 	console.log(`🔌 WebSocket server initialized`);
 	console.log(`💾 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
