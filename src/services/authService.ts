@@ -172,3 +172,60 @@ export async function getUserData(userId: string): Promise<UserData> {
 
 	return userData;
 }
+
+/**
+ * Change user password
+ */
+export async function changePassword(
+	userId: string,
+	currentPassword: string,
+	newPassword: string,
+): Promise<void> {
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		select: {
+			id: true,
+			password: true,
+			deletedAt: true,
+		},
+	});
+
+	if (!user) {
+		throw new AuthServiceError('User not found', 404, 'USER_NOT_FOUND');
+	}
+
+	// Check if account is deleted
+	if (user.deletedAt !== null) {
+		throw new AuthServiceError('This account has been deleted', 403, 'ACCOUNT_DELETED');
+	}
+
+	// Verify current password
+	const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+
+	if (!isCurrentPasswordValid) {
+		throw new AuthServiceError('Current password is incorrect', 401, 'INVALID_PASSWORD');
+	}
+
+	// Check if new password is different from current password
+	const isSamePassword = await bcrypt.compare(newPassword, user.password);
+
+	if (isSamePassword) {
+		throw new AuthServiceError(
+			'New password must be different from current password',
+			400,
+			'SAME_PASSWORD',
+		);
+	}
+
+	// Hash new password
+	const saltRounds = 12;
+	const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+	// Update password
+	await prisma.user.update({
+		where: { id: userId },
+		data: {
+			password: hashedNewPassword,
+		},
+	});
+}

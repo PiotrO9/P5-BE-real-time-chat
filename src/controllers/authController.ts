@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { setAuthCookies, clearAuthCookies } from '../utils/jwt';
-import { loginSchema, registerSchema } from '../utils/validationSchemas';
+import { loginSchema, registerSchema, updatePasswordSchema } from '../utils/validationSchemas';
 import {
 	registerUser,
 	loginUser,
 	refreshAccessToken,
 	logoutUser,
 	getUserData,
+	changePassword,
 } from '../services/authService';
 import { AuthServiceError } from '../types/auth';
 import { UserService } from '../services/userService';
@@ -237,6 +238,61 @@ export async function me(req: Request, res: Response): Promise<void> {
 		}
 
 		console.error('Get user data error:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Internal server error',
+		});
+	}
+}
+
+/**
+ * Change user password
+ * POST /api/auth/change-password
+ */
+export async function changePasswordHandler(req: Request, res: Response): Promise<void> {
+	try {
+		const userId = (req as any).user?.userId;
+
+		if (!userId) {
+			res.status(401).json({
+				success: false,
+				message: 'User not authenticated',
+			});
+			return;
+		}
+
+		const validationResult = updatePasswordSchema.safeParse(req.body);
+
+		if (!validationResult.success) {
+			res.status(400).json({
+				success: false,
+				message: 'Validation failed',
+				details: validationResult.error.issues.map(issue => ({
+					field: issue.path.join('.'),
+					message: issue.message,
+				})),
+			});
+			return;
+		}
+
+		const { currentPassword, newPassword } = validationResult.data;
+
+		await changePassword(userId, currentPassword, newPassword);
+
+		res.status(200).json({
+			success: true,
+			message: 'Password changed successfully',
+		});
+	} catch (error) {
+		if (error instanceof AuthServiceError) {
+			res.status(error.statusCode).json({
+				success: false,
+				message: error.message,
+			});
+			return;
+		}
+
+		console.error('Change password error:', error);
 		res.status(500).json({
 			success: false,
 			message: 'Internal server error',

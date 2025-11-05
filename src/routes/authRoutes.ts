@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { register, login, refresh, logout, me } from '../controllers/authController';
+import {
+	register,
+	login,
+	refresh,
+	logout,
+	me,
+	changePasswordHandler,
+} from '../controllers/authController';
 import { authenticateToken, authenticateTokenWithoutRefresh } from '../middleware/auth';
 
 const router = Router();
@@ -296,6 +303,91 @@ router.post('/logout', logout);
  *         description: Internal server error
  */
 router.get('/me', authenticateToken, me);
+
+/**
+ * @openapi
+ * /api/auth/change-password:
+ *   post:
+ *     summary: Change user password
+ *     description: Change password for authenticated user. Requires current password for verification.
+ *     tags:
+ *       - auth
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 description: Current password for verification
+ *                 example: "currentPassword123"
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *                 maxLength: 128
+ *                 description: New password (must contain at least one lowercase, one uppercase, one number, and one special character)
+ *                 example: "NewPassword123!"
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Password changed successfully
+ *       400:
+ *         description: Bad request - validation error or new password same as current
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                 details:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       field:
+ *                         type: string
+ *                       message:
+ *                         type: string
+ *       401:
+ *         description: Unauthorized - invalid current password or not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Current password is incorrect
+ *       403:
+ *         description: Forbidden - account deleted
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/change-password', authenticateToken, changePasswordHandler);
 
 // Example: If you want to use authentication WITHOUT sliding session for specific endpoints:
 // router.get('/some-endpoint', authenticateTokenWithoutRefresh, someController);
