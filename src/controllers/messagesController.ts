@@ -53,6 +53,33 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
 		// Get messages from the service
 		const result = await messageService.getMessages(userId, chatId, limit, offset);
 
+		// Get user data for socket events
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+			select: { username: true },
+		});
+
+		// Emit socket events for messages that were just marked as read
+		if (user && result.messages) {
+			const now = new Date();
+			const fiveSecondsAgo = new Date(now.getTime() - 5000); // 5 second window
+
+			result.messages.forEach(message => {
+				// Check if this message was just marked as read by this user
+				const userRead = message.reads?.find(
+					read => read.userId === userId && new Date(read.readAt) >= fiveSecondsAgo,
+				);
+
+				if (userRead) {
+					emitMessageRead(chatId, message.id, {
+						userId,
+						username: user.username,
+						readAt: new Date(userRead.readAt),
+					});
+				}
+			});
+		}
+
 		ResponseHelper.success(res, 'Messages retrieved successfully', result);
 	} catch (error) {
 		if (error instanceof Error) {

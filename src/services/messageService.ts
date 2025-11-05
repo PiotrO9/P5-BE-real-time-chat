@@ -75,7 +75,7 @@ export class MessageService {
 				},
 			},
 			orderBy: {
-				createdAt: 'desc',
+				createdAt: 'asc',
 			},
 			skip: offset,
 			take: limit + 1, // Take one more to check if there are more messages
@@ -83,6 +83,72 @@ export class MessageService {
 
 		const hasMore = messages.length > limit;
 		const messagesToReturn = hasMore ? messages.slice(0, limit) : messages;
+
+		// Mark all fetched messages as read (except user's own messages)
+		const messageIdsToMarkAsRead = messagesToReturn
+			.filter(message => message.senderId !== userId)
+			.map(message => message.id);
+
+		// Get user data for read records
+		let userUsername: string | null = null;
+		if (messageIdsToMarkAsRead.length > 0) {
+			const user = await prisma.user.findUnique({
+				where: { id: userId },
+				select: { username: true },
+			});
+			userUsername = user?.username || null;
+
+			// Get existing read records
+			const existingReads = await prisma.messageRead.findMany({
+				where: {
+					messageId: { in: messageIdsToMarkAsRead },
+					userId,
+					deletedAt: null,
+				},
+				select: {
+					messageId: true,
+				},
+			});
+
+			const existingReadMessageIds = new Set(existingReads.map(r => r.messageId));
+
+			// Create read records for messages that haven't been read yet
+			const messagesToCreateRead = messageIdsToMarkAsRead.filter(
+				id => !existingReadMessageIds.has(id),
+			);
+
+			if (messagesToCreateRead.length > 0) {
+				await prisma.messageRead.createMany({
+					data: messagesToCreateRead.map(messageId => ({
+						messageId,
+						userId,
+						createdBy: userId,
+					})),
+					skipDuplicates: true,
+				});
+
+				// Add newly created read records to the messages
+				if (userUsername) {
+					const now = new Date();
+					messagesToReturn.forEach(message => {
+						if (messagesToCreateRead.includes(message.id)) {
+							message.reads.push({
+								id: '',
+								messageId: message.id,
+								userId,
+								readAt: now,
+								deletedAt: null,
+								createdBy: userId,
+								updatedBy: null,
+								user: {
+									username: userUsername!,
+								},
+							});
+						}
+					});
+				}
+			}
+		}
 
 		// Get total count of messages
 		const total = await prisma.message.count({
@@ -181,13 +247,31 @@ export class MessageService {
 		}
 
 		// Create the message
-		const message = await prisma.message.create({
+		const createdMessage = await prisma.message.create({
 			data: {
 				chatId,
 				senderId: userId,
 				content,
 				replyToId: replyToId || null,
 				createdBy: userId,
+			},
+		});
+
+		// Update chat's updatedAt timestamp
+		await prisma.chat.update({
+			where: {
+				id: chatId,
+			},
+			data: {
+				updatedBy: userId,
+				updatedAt: new Date(), // Explicitly update to ensure timestamp is refreshed
+			},
+		});
+
+		// Fetch the message with all relations to ensure consistency with getMessages
+		const message = await prisma.message.findUnique({
+			where: {
+				id: createdMessage.id,
 			},
 			include: {
 				sender: {
@@ -206,17 +290,52 @@ export class MessageService {
 						},
 					},
 				},
+				reactions: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								id: true,
+							},
+						},
+					},
+				},
+				reads: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								username: true,
+							},
+						},
+					},
+				},
 			},
 		});
 
-		// Update chat's updatedAt timestamp
-		await prisma.chat.update({
-			where: {
-				id: chatId,
-			},
-			data: {
-				updatedBy: userId,
-			},
+		if (!message) {
+			throw new Error('Failed to retrieve created message');
+		}
+
+		// Group reactions by emoji
+		const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
+
+		message.reactions.forEach(reaction => {
+			const existing = reactionsMap.get(reaction.emoji);
+			if (existing) {
+				existing.count++;
+				existing.userIds.push(reaction.user.id);
+			} else {
+				reactionsMap.set(reaction.emoji, {
+					emoji: reaction.emoji,
+					count: 1,
+					userIds: [reaction.user.id],
+				});
+			}
 		});
 
 		return {
@@ -235,8 +354,12 @@ export class MessageService {
 						senderUsername: message.replyTo.sender.username,
 				  }
 				: null,
-			reactions: [],
-			reads: [],
+			reactions: Array.from(reactionsMap.values()),
+			reads: message.reads.map(read => ({
+				userId: read.userId,
+				username: read.user.username,
+				readAt: read.readAt,
+			})),
 		};
 	}
 
