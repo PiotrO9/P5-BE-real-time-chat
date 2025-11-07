@@ -106,12 +106,15 @@ app.use('/api', apiRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-server.listen(PORT, () => {
-	console.log(`🚀 Server is running on http://localhost:${PORT}`);
-	console.log(`📚 API available at http://localhost:${PORT}/api`);
-	console.log(`📖 Swagger docs available at http://localhost:${PORT}/api/docs`);
-	console.log(`🔌 WebSocket server initialized`);
-	console.log(`💾 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+	server.listen(PORT, () => {
+		console.log(`🚀 Server is running on http://localhost:${PORT}`);
+		console.log(`📚 API available at http://localhost:${PORT}/api`);
+		console.log(`📖 Swagger docs available at http://localhost:${PORT}/api/docs`);
+		console.log(`🔌 WebSocket server initialized`);
+		console.log(`💾 Environment: ${process.env.NODE_ENV || 'development'}`);
+	});
+}
 
 export { app, io };
