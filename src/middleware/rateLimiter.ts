@@ -1,3 +1,4 @@
+/// <reference path="../types/express.d.ts" />
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 
@@ -10,17 +11,21 @@ export const sendMessageRateLimiter = rateLimit({
 	max: 30, // maksymalnie 30 wiadomości na minutę
 	message: {
 		success: false,
-		message: 'Zbyt wiele wiadomości. Spróbuj ponownie za chwilę.',
+		message: 'Too many messages. Please try again later.',
 	},
 	standardHeaders: true, // zwraca informacje o limicie w nagłówkach `RateLimit-*`
 	legacyHeaders: false, // wyłącza nagłówki `X-RateLimit-*`
 	handler: (req: Request, res: Response) => {
+		const resetTime = req.rateLimit?.resetTime
+			? typeof req.rateLimit.resetTime === 'number'
+				? req.rateLimit.resetTime
+				: req.rateLimit.resetTime.getTime()
+			: Date.now() + 60 * 1000;
+
 		res.status(429).json({
 			success: false,
-			message: 'Zbyt wiele wiadomości. Spróbuj ponownie za chwilę.',
-			retryAfter: Math.ceil(
-				((req.rateLimit?.resetTime || Date.now() + 60 * 1000) - Date.now()) / 1000,
-			),
+			message: 'Too many messages. Please try again later.',
+			retryAfter: Math.ceil((resetTime - Date.now()) / 1000),
 		});
 	},
 });
