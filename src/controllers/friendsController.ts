@@ -67,7 +67,10 @@ export async function inviteFriend(req: Request, res: Response, next: NextFuncti
 		);
 	} catch (error) {
 		if (error instanceof Error) {
-			ResponseHelper.error(res, error.message, 400);
+			const statusCode = error.message.includes('does not exist') || error.message.includes('not found')
+				? 404
+				: 400;
+			ResponseHelper.error(res, error.message, statusCode);
 			return;
 		}
 		next(error);
