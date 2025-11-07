@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
+import { sendMessageRateLimiter } from '../middleware/rateLimiter';
 import {
 	getMessages,
 	sendMessage,
@@ -221,10 +222,26 @@ router.get('/:chatId/messages', authenticateToken, getMessages);
  *         description: Forbidden - user is not a member of the chat
  *       401:
  *         description: Unauthorized
+ *       429:
+ *         description: Too Many Requests - rate limit exceeded (30 messages per minute per IP)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Zbyt wiele wiadomości. Spróbuj ponownie za chwilę.
+ *                 retryAfter:
+ *                   type: number
+ *                   example: 45
  *       500:
  *         description: Internal server error
  */
-router.post('/:chatId/messages', authenticateToken, sendMessage);
+router.post('/:chatId/messages', authenticateToken, sendMessageRateLimiter, sendMessage);
 
 /**
  * @openapi
