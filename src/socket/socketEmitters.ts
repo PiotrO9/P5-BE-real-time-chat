@@ -147,3 +147,19 @@ export function emitTypingStop(chatId: string, userId: string) {
 	const io = getIo();
 	io.to(`chat:${chatId}`).emit('typing:stop', { chatId, userId });
 }
+
+/**
+ * Emit message pinned to chat room
+ */
+export function emitMessagePinned(chatId: string, pinnedMessage: any) {
+	const io = getIo();
+	io.to(`chat:${chatId}`).emit('message:pinned', { chatId, pinnedMessage });
+}
+
+/**
+ * Emit message unpinned to chat room
+ */
+export function emitMessageUnpinned(chatId: string, messageId: string) {
+	const io = getIo();
+	io.to(`chat:${chatId}`).emit('message:unpinned', { chatId, messageId });
+}

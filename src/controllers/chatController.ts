@@ -14,6 +14,8 @@ import {
 	emitChatUpdated,
 	emitMemberAdded,
 	emitMemberRemoved,
+	emitMessagePinned,
+	emitMessageUnpinned,
 } from '../socket/socketEmitters';
 import { PrismaClient } from '@prisma/client';
 
@@ -359,6 +361,138 @@ export async function updateChatMembersRole(req: Request, res: Response, next: N
 			throw error;
 		}
 	} catch (error) {
+		next(error);
+	}
+}
+
+/**
+ * Get pinned messages for a chat
+ * GET /api/chats/:chatId/pinned
+ */
+export async function getPinnedMessages(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.user?.userId;
+
+		if (!userId) {
+			ResponseHelper.unauthorized(res);
+			return;
+		}
+
+		const chatId = req.params.id;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		const pinnedMessages = await chatService.getPinnedMessages(userId, chatId);
+
+		ResponseHelper.success(res, 'Pinned messages retrieved successfully', { pinnedMessages });
+	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
+		next(error);
+	}
+}
+
+/**
+ * Pin a message in a chat
+ * POST /api/chats/:chatId/pin/:messageId
+ */
+export async function pinMessage(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.user?.userId;
+
+		if (!userId) {
+			ResponseHelper.unauthorized(res);
+			return;
+		}
+
+		const chatId = req.params.id;
+		const messageId = req.params.messageId;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		if (!messageId) {
+			ResponseHelper.error(res, 'Message ID is required', 400);
+			return;
+		}
+
+		const pinnedMessage = await chatService.pinMessage(userId, chatId, messageId);
+
+		// Emit socket event to all chat members
+		emitMessagePinned(chatId, pinnedMessage);
+
+		ResponseHelper.success(res, 'Message pinned successfully', pinnedMessage, 201);
+	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Message not found in this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Message is already pinned') {
+				ResponseHelper.error(res, error.message, 400);
+				return;
+			}
+		}
+		next(error);
+	}
+}
+
+/**
+ * Unpin a message from a chat
+ * DELETE /api/chats/:chatId/unpin/:messageId
+ */
+export async function unpinMessage(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.user?.userId;
+
+		if (!userId) {
+			ResponseHelper.unauthorized(res);
+			return;
+		}
+
+		const chatId = req.params.id;
+		const messageId = req.params.messageId;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		if (!messageId) {
+			ResponseHelper.error(res, 'Message ID is required', 400);
+			return;
+		}
+
+		const result = await chatService.unpinMessage(userId, chatId, messageId);
+
+		// Emit socket event to all chat members
+		emitMessageUnpinned(chatId, messageId);
+
+		ResponseHelper.success(res, 'Message unpinned successfully', result);
+	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Message is not pinned') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
 		next(error);
 	}
 }

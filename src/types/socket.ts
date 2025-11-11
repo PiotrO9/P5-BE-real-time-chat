@@ -40,6 +40,25 @@ export interface ServerToClientEvents {
 	'chat:updated': (data: { chatId: string; updates: any }) => void;
 	'member:added': (data: { chatId: string; member: any }) => void;
 	'member:removed': (data: { chatId: string; userId: string }) => void;
+	'message:pinned': (data: {
+		chatId: string;
+		pinnedMessage: {
+			id: string;
+			message: {
+				id: string;
+				content: string;
+				senderId: string;
+				senderUsername: string;
+				createdAt: Date;
+			};
+			pinnedBy: {
+				id: string;
+				username: string;
+			};
+			pinnedAt: Date;
+		};
+	}) => void;
+	'message:unpinned': (data: { chatId: string; messageId: string }) => void;
 }
 
 // Inter-server Events

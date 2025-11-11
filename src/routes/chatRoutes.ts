@@ -9,6 +9,9 @@ import {
 	addChatMembers,
 	removeChatMembers,
 	updateChatMembersRole,
+	getPinnedMessages,
+	pinMessage,
+	unpinMessage,
 } from '../controllers/chatController';
 
 const router = Router();
@@ -589,5 +592,155 @@ router.delete('/:id/members', authenticateToken, removeChatMembers);
  *         description: Internal server error
  */
 router.patch('/:id/members/:userId/role', authenticateToken, updateChatMembersRole);
+
+/**
+ * @openapi
+ * /api/chats/{chatId}/pinned:
+ *   get:
+ *     summary: Get all pinned messages for a chat
+ *     description: Returns a list of all pinned messages in a chat
+ *     tags:
+ *       - chats
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Chat ID
+ *     responses:
+ *       200:
+ *         description: Pinned messages retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Pinned messages retrieved successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     pinnedMessages:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       404:
+ *         description: Chat not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/:id/pinned', authenticateToken, getPinnedMessages);
+
+/**
+ * @openapi
+ * /api/chats/{chatId}/pin/{messageId}:
+ *   post:
+ *     summary: Pin a message in a chat
+ *     description: Pins a message in a chat. User must be a member of the chat.
+ *     tags:
+ *       - chats
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Chat ID
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Message ID
+ *     responses:
+ *       201:
+ *         description: Message pinned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Message pinned successfully
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Bad request (message already pinned)
+ *       404:
+ *         description: Chat or message not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/:id/pin/:messageId', authenticateToken, pinMessage);
+
+/**
+ * @openapi
+ * /api/chats/{chatId}/unpin/{messageId}:
+ *   delete:
+ *     summary: Unpin a message from a chat
+ *     description: Unpins a message from a chat. User must be a member of the chat.
+ *     tags:
+ *       - chats
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Chat ID
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Message ID
+ *     responses:
+ *       200:
+ *         description: Message unpinned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Message unpinned successfully
+ *                 data:
+ *                   type: object
+ *       404:
+ *         description: Chat or message not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+router.delete('/:id/unpin/:messageId', authenticateToken, unpinMessage);
 
 export { router as chatRoutes };

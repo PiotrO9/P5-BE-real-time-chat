@@ -22,6 +22,7 @@ export interface MessageResponse {
 		username: string;
 		readAt: Date;
 	}[];
+	isPinned?: boolean;
 }
 
 export interface MessagesListResponse {

@@ -158,6 +158,19 @@ export class MessageService {
 			},
 		});
 
+		// Get all pinned messages for this chat
+		const pinnedMessages = await prisma.pinnedMessage.findMany({
+			where: {
+				chatId,
+				deletedAt: null,
+			},
+			select: {
+				messageId: true,
+			},
+		});
+
+		const pinnedMessageIds = new Set(pinnedMessages.map(pm => pm.messageId));
+
 		// Format messages
 		const formattedMessages: MessageResponse[] = messagesToReturn.map(message => {
 			// Group reactions by emoji
@@ -199,6 +212,7 @@ export class MessageService {
 					username: read.user.username,
 					readAt: read.readAt,
 				})),
+				isPinned: pinnedMessageIds.has(message.id),
 			};
 		});
 
@@ -360,6 +374,7 @@ export class MessageService {
 				username: read.user.username,
 				readAt: read.readAt,
 			})),
+			isPinned: false, // New message cannot be pinned immediately
 		};
 	}
 
@@ -434,6 +449,15 @@ export class MessageService {
 			},
 		});
 
+		// Check if message is pinned
+		const pinnedMessage = await prisma.pinnedMessage.findFirst({
+			where: {
+				chatId: updatedMessage.chatId,
+				messageId: updatedMessage.id,
+				deletedAt: null,
+			},
+		});
+
 		// Group reactions by emoji
 		const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
 
@@ -473,6 +497,7 @@ export class MessageService {
 				username: read.user.username,
 				readAt: read.readAt,
 			})),
+			isPinned: !!pinnedMessage,
 		};
 	}
 
@@ -587,6 +612,19 @@ export class MessageService {
 			},
 		});
 
+		// Get all pinned messages for this chat
+		const pinnedMessages = await prisma.pinnedMessage.findMany({
+			where: {
+				chatId: message.chatId,
+				deletedAt: null,
+			},
+			select: {
+				messageId: true,
+			},
+		});
+
+		const pinnedMessageIds = new Set(pinnedMessages.map(pm => pm.messageId));
+
 		// Format replies
 		return replies.map(reply => {
 			// Group reactions by emoji
@@ -628,6 +666,7 @@ export class MessageService {
 					username: read.user.username,
 					readAt: read.readAt,
 				})),
+				isPinned: pinnedMessageIds.has(reply.id),
 			};
 		});
 	}

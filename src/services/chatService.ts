@@ -1037,4 +1037,246 @@ export class ChatService {
 		const updatedChat = await this.getChatById(userId, chatId);
 		return updatedChat;
 	}
+
+	/**
+	 * Gets all pinned messages for a chat
+	 */
+	async getPinnedMessages(userId: string, chatId: string) {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Get all pinned messages for this chat
+		const pinnedMessages = await prisma.pinnedMessage.findMany({
+			where: {
+				chatId,
+				deletedAt: null,
+			},
+			include: {
+				message: {
+					include: {
+						sender: {
+							select: {
+								id: true,
+								username: true,
+							},
+						},
+					},
+				},
+				pinnedBy: {
+					select: {
+						id: true,
+						username: true,
+					},
+				},
+			},
+			orderBy: {
+				pinnedAt: 'desc',
+			},
+		});
+
+		return pinnedMessages.map(pm => ({
+			id: pm.id,
+			message: {
+				id: pm.message.id,
+				content: pm.message.content,
+				senderId: pm.message.senderId,
+				senderUsername: pm.message.sender.username,
+				createdAt: pm.message.createdAt,
+			},
+			pinnedBy: {
+				id: pm.pinnedBy.id,
+				username: pm.pinnedBy.username,
+			},
+			pinnedAt: pm.pinnedAt,
+		}));
+	}
+
+	/**
+	 * Pins a message in a chat
+	 */
+	async pinMessage(userId: string, chatId: string, messageId: string) {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if message exists and belongs to this chat
+		const message = await prisma.message.findFirst({
+			where: {
+				id: messageId,
+				chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!message) {
+			throw new Error('Message not found in this chat');
+		}
+
+		// Check if message is already pinned (active)
+		const existingActivePin = await prisma.pinnedMessage.findFirst({
+			where: {
+				chatId,
+				messageId,
+				deletedAt: null,
+			},
+		});
+
+		if (existingActivePin) {
+			throw new Error('Message is already pinned');
+		}
+
+		// Check if there's a soft-deleted pin (was unpinned before)
+		const existingDeletedPin = await prisma.pinnedMessage.findFirst({
+			where: {
+				chatId,
+				messageId,
+				deletedAt: { not: null },
+			},
+		});
+
+		let pinnedMessage;
+
+		if (existingDeletedPin) {
+			// Restore the existing pin (update instead of create)
+			pinnedMessage = await prisma.pinnedMessage.update({
+				where: {
+					id: existingDeletedPin.id,
+				},
+				data: {
+					deletedAt: null,
+					pinnedById: userId,
+					pinnedAt: new Date(),
+					updatedBy: userId,
+				},
+				include: {
+					message: {
+						include: {
+							sender: {
+								select: {
+									id: true,
+									username: true,
+								},
+							},
+						},
+					},
+					pinnedBy: {
+						select: {
+							id: true,
+							username: true,
+						},
+					},
+				},
+			});
+		} else {
+			// Create new pin
+			pinnedMessage = await prisma.pinnedMessage.create({
+				data: {
+					chatId,
+					messageId,
+					pinnedById: userId,
+					createdBy: userId,
+				},
+				include: {
+					message: {
+						include: {
+							sender: {
+								select: {
+									id: true,
+									username: true,
+								},
+							},
+						},
+					},
+					pinnedBy: {
+						select: {
+							id: true,
+							username: true,
+						},
+					},
+				},
+			});
+		}
+
+		return {
+			id: pinnedMessage.id,
+			message: {
+				id: pinnedMessage.message.id,
+				content: pinnedMessage.message.content,
+				senderId: pinnedMessage.message.senderId,
+				senderUsername: pinnedMessage.message.sender.username,
+				createdAt: pinnedMessage.message.createdAt,
+			},
+			pinnedBy: {
+				id: pinnedMessage.pinnedBy.id,
+				username: pinnedMessage.pinnedBy.username,
+			},
+			pinnedAt: pinnedMessage.pinnedAt,
+		};
+	}
+
+	/**
+	 * Unpins a message from a chat
+	 */
+	async unpinMessage(userId: string, chatId: string, messageId: string) {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Check if message is pinned
+		const pinnedMessage = await prisma.pinnedMessage.findFirst({
+			where: {
+				chatId,
+				messageId,
+				deletedAt: null,
+			},
+		});
+
+		if (!pinnedMessage) {
+			throw new Error('Message is not pinned');
+		}
+
+		// Unpin the message (soft delete)
+		await prisma.pinnedMessage.update({
+			where: {
+				id: pinnedMessage.id,
+			},
+			data: {
+				deletedAt: new Date(),
+				updatedBy: userId,
+			},
+		});
+
+		return {
+			messageId,
+			chatId,
+		};
+	}
 }

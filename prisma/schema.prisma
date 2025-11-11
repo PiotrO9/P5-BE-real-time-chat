@@ -39,6 +39,7 @@ model User {
   reactions            MessageReaction[]
   refreshTokens        RefreshToken[]
   reads                MessageRead[]
+  pinnedMessages       PinnedMessage[]
 }
 
 model RefreshToken {
@@ -63,6 +64,7 @@ model Chat {
 
   chatUsers   ChatUser[]
   messages    Message[]
+  pinnedMessages PinnedMessage[]
 
   @@index([createdAt])
   @@index([isGroup])
@@ -106,6 +108,7 @@ model Message {
 
   reactions   MessageReaction[]
   reads       MessageRead[]
+  pinnedMessages PinnedMessage[]
 
   @@index([chatId, createdAt])
   @@index([chatId, senderId])
@@ -172,4 +175,23 @@ model FriendInvite {
 
   @@index([senderId])
   @@index([receiverId])
+}
+
+model PinnedMessage {
+  id         String   @id @default(uuid())
+  chat       Chat     @relation(fields: [chatId], references: [id])
+  chatId     String
+  message    Message  @relation(fields: [messageId], references: [id])
+  messageId  String
+  pinnedBy   User     @relation(fields: [pinnedById], references: [id])
+  pinnedById String
+  pinnedAt   DateTime @default(now())
+  deletedAt  DateTime?
+  createdBy  String?
+  updatedBy  String?
+
+  @@unique([chatId, messageId])
+  @@index([chatId])
+  @@index([messageId])
+  @@index([pinnedById])
 }
