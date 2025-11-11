@@ -25,6 +25,11 @@ export interface UpdatePasswordData {
 	newPassword: string;
 }
 
+export interface UpdateEmailData {
+	newEmail: string;
+	password: string;
+}
+
 export interface PaginationParams {
 	page: number;
 	limit: number;

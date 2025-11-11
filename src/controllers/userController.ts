@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { updatePasswordSchema } from '../utils/validationSchemas';
+import { updatePasswordSchema, updateEmailSchema } from '../utils/validationSchemas';
 import { UserService } from '../services/userService';
 import { UserServiceError } from '../types/user';
 
@@ -154,6 +154,51 @@ export async function updateUserPassword(req: Request, res: Response, next: Next
 
 		return res.status(200).json({
 			message: 'Password updated successfully',
+		});
+	} catch (error) {
+		if (error instanceof UserServiceError) {
+			return res.status(error.statusCode).json({
+				error: error.message,
+			});
+		}
+		next(error);
+		return;
+	}
+}
+
+/**
+ * Update user email
+ * PUT /api/users/:id/email
+ */
+export async function updateUserEmail(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.params.id;
+
+		if (!req.user || req.user.userId !== userId) {
+			return res.status(403).json({
+				error: 'You can only change your own email',
+			});
+		}
+
+		const validationResult = updateEmailSchema.safeParse(req.body);
+
+		if (!validationResult.success) {
+			return res.status(400).json({
+				error: 'Validation failed',
+				details: validationResult.error.issues.map(issue => ({
+					field: issue.path.join('.'),
+					message: issue.message,
+				})),
+			});
+		}
+
+		const { newEmail, password } = validationResult.data;
+
+		const updatedUser = await userService.updateUserEmail(userId, { newEmail, password });
+
+		return res.status(200).json({
+			message: 'Email updated successfully',
+			user: updatedUser,
 		});
 	} catch (error) {
 		if (error instanceof UserServiceError) {

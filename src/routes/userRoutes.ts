@@ -5,7 +5,7 @@ import {
 	updateUserProfile,
 	deleteUser,
 	getUserStatus,
-	updateUserPassword,
+	updateUserEmail,
 } from '../controllers/userController';
 import { authenticateToken, authorizeUserModification } from '../middleware/auth';
 
@@ -204,10 +204,10 @@ router.get('/:id/status', authenticateToken, getUserStatus);
 
 /**
  * @openapi
- * /api/users/{id}/password:
+ * /api/users/{id}/email:
  *   patch:
- *     summary: Update user password
- *     description: Update the password for the authenticated user (only the user themselves can update)
+ *     summary: Update user email
+ *     description: Update the email for the authenticated user (only the user themselves can update)
  *     tags:
  *       - users
  *     security:
@@ -227,20 +227,19 @@ router.get('/:id/status', authenticateToken, getUserStatus);
  *           schema:
  *             type: object
  *             required:
- *               - currentPassword
- *               - newPassword
+ *               - newEmail
+ *               - password
  *             properties:
- *               currentPassword:
+ *               newEmail:
+ *                 type: string
+ *                 format: email
+ *                 example: "newemail@example.com"
+ *               password:
  *                 type: string
  *                 example: "currentPassword123"
- *               newPassword:
- *                 type: string
- *                 minLength: 8
- *                 maxLength: 128
- *                 example: "NewSecurePassword123!"
  *     responses:
  *       200:
- *         description: Password updated successfully
+ *         description: Email updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -251,19 +250,41 @@ router.get('/:id/status', authenticateToken, getUserStatus);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: Password updated successfully
+ *                   example: Email updated successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     username:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     lastSeen:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
  *       400:
  *         description: Bad request - validation error
  *       403:
- *         description: Forbidden - can only update own password
+ *         description: Forbidden - can only update own email
  *       404:
  *         description: User not found
+ *       409:
+ *         description: Conflict - email already exists
  *       401:
  *         description: Unauthorized
  *       500:
  *         description: Internal server error
  */
-router.patch('/:id/password', authenticateToken, authorizeUserModification, updateUserPassword);
+router.patch('/:id/email', authenticateToken, authorizeUserModification, updateUserEmail);
 
 /**
  * @openapi

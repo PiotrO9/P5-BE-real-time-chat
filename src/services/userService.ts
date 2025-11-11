@@ -5,6 +5,7 @@ import {
 	UserBasic,
 	UpdateUserData,
 	UpdatePasswordData,
+	UpdateEmailData,
 	PaginationParams,
 	PaginatedUsersResponse,
 	UserStatus,
@@ -209,6 +210,60 @@ export class UserService {
 			where: { id: userId },
 			data: { password: hashedNewPassword },
 		});
+	}
+
+	/**
+	 * Updates user email
+	 */
+	async updateUserEmail(userId: string, data: UpdateEmailData): Promise<UserProfile> {
+		const { newEmail, password } = data;
+
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+		});
+
+		if (!user) {
+			throw new UserServiceError('User not found', 404, 'USER_NOT_FOUND');
+		}
+
+		if (newEmail === user.email) {
+			throw new UserServiceError(
+				'New email must be different from current email',
+				400,
+				'SAME_EMAIL',
+			);
+		}
+
+		const isMatch = await bcrypt.compare(password, user.password);
+		if (!isMatch) {
+			throw new UserServiceError('Password is incorrect', 400, 'INCORRECT_PASSWORD');
+		}
+
+		const emailExists = await prisma.user.findUnique({
+			where: { email: newEmail },
+		});
+
+		if (emailExists) {
+			throw new UserServiceError('Email already in use', 400, 'EMAIL_IN_USE');
+		}
+
+		const updatedUser = await prisma.user.update({
+			where: { id: userId },
+			data: {
+				email: newEmail,
+				updatedAt: new Date(),
+			},
+			select: {
+				id: true,
+				email: true,
+				username: true,
+				createdAt: true,
+				updatedAt: true,
+				lastSeen: true,
+			},
+		});
+
+		return updatedUser;
 	}
 
 	/**
