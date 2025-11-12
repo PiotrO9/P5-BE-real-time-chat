@@ -58,6 +58,7 @@ export class SeedService {
 	private async clearDatabase(): Promise<void> {
 		await prisma.messageReaction.deleteMany();
 		await prisma.messageRead.deleteMany();
+		await prisma.pinnedMessage.deleteMany();
 		await prisma.message.deleteMany();
 		await prisma.chatUser.deleteMany();
 		await prisma.chat.deleteMany();
@@ -414,6 +415,7 @@ export class SeedService {
 	async clearSeededData(): Promise<void> {
 		await prisma.messageReaction.deleteMany();
 		await prisma.messageRead.deleteMany();
+		await prisma.pinnedMessage.deleteMany();
 		await prisma.message.deleteMany();
 		await prisma.chatUser.deleteMany();
 		await prisma.chat.deleteMany();
