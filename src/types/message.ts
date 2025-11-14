@@ -30,4 +30,5 @@ export interface MessagesListResponse {
 	messages: MessageResponse[];
 	total: number;
 	hasMore: boolean;
+	lastReadMessageId?: string | null;
 }

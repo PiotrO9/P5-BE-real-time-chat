@@ -59,25 +59,18 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
 			select: { username: true },
 		});
 
-		// Emit socket events for messages that were just marked as read
-		if (user && result.messages) {
-			const now = new Date();
-			const fiveSecondsAgo = new Date(now.getTime() - 5000); // 5 second window
+		// Emit socket event if lastReadMessageId was updated
+		if (user && result.lastReadMessageId && result.messages.length > 0) {
+			// Emit for the last read message (newest message in the list)
+			const lastReadMessage = result.messages.find(m => m.id === result.lastReadMessageId);
 
-			result.messages.forEach(message => {
-				// Check if this message was just marked as read by this user
-				const userRead = message.reads?.find(
-					read => read.userId === userId && new Date(read.readAt) >= fiveSecondsAgo,
-				);
-
-				if (userRead) {
-					emitMessageRead(chatId, message.id, {
-						userId,
-						username: user.username,
-						readAt: new Date(userRead.readAt),
-					});
-				}
-			});
+			if (lastReadMessage && lastReadMessage.senderId !== userId) {
+				emitMessageRead(chatId, result.lastReadMessageId, {
+					userId,
+					username: user.username,
+					readAt: new Date(),
+				});
+			}
 		}
 
 		ResponseHelper.success(res, 'Messages retrieved successfully', result);

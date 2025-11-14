@@ -553,41 +553,49 @@ export class ChatService {
 	 * Gets unread message count for a user in a specific chat
 	 */
 	private async getUnreadCount(userId: string, chatId: string): Promise<number> {
-		// Get all messages in the chat
-		const messages = await prisma.message.findMany({
+		// Get ChatUser with lastReadMessage
+		const chatUser = await prisma.chatUser.findUnique({
+			where: {
+				userId_chatId: {
+					userId,
+					chatId,
+				},
+			},
+			select: {
+				lastReadMessage: {
+					select: {
+						createdAt: true,
+					},
+				},
+			},
+		});
+
+		// If user hasn't read any message yet, count all messages (except own)
+		if (!chatUser?.lastReadMessage) {
+			return await prisma.message.count({
+				where: {
+					chatId,
+					deletedAt: null,
+					senderId: {
+						not: userId,
+					},
+				},
+			});
+		}
+
+		// Count messages newer than lastReadMessage (not read yet)
+		return await prisma.message.count({
 			where: {
 				chatId,
 				deletedAt: null,
-				// Don't count user's own messages
 				senderId: {
 					not: userId,
 				},
-			},
-			select: {
-				id: true,
-			},
-		});
-
-		// Get messages that user has read
-		const readMessages = await prisma.messageRead.findMany({
-			where: {
-				userId,
-				messageId: {
-					in: messages.map(m => m.id),
+				createdAt: {
+					gt: chatUser.lastReadMessage.createdAt,
 				},
-				deletedAt: null,
-			},
-			select: {
-				messageId: true,
 			},
 		});
-
-		const readMessageIds = new Set(readMessages.map(r => r.messageId));
-
-		// Count messages that haven't been read
-		const unreadCount = messages.filter(m => !readMessageIds.has(m.id)).length;
-
-		return unreadCount;
 	}
 
 	/**

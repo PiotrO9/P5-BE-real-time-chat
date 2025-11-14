@@ -26,7 +26,7 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// Get messages from the chat
+		// Get messages from the chat (najnowsze pierwsze)
 		const messages = await prisma.message.findMany({
 			where: {
 				chatId,
@@ -75,7 +75,7 @@ export class MessageService {
 				},
 			},
 			orderBy: {
-				createdAt: 'asc',
+				createdAt: 'desc', // Najnowsze pierwsze
 			},
 			skip: offset,
 			take: limit + 1, // Take one more to check if there are more messages
@@ -84,71 +84,40 @@ export class MessageService {
 		const hasMore = messages.length > limit;
 		const messagesToReturn = hasMore ? messages.slice(0, limit) : messages;
 
-		// Mark all fetched messages as read (except user's own messages)
-		const messageIdsToMarkAsRead = messagesToReturn
-			.filter(message => message.senderId !== userId)
-			.map(message => message.id);
+		// Znajdź najnowszą wiadomość (pierwsza w tablicy, bo sort desc)
+		// i zaktualizuj lastReadMessageId w ChatUser
+		if (messagesToReturn.length > 0) {
+			const newestMessage = messagesToReturn[0];
 
-		// Get user data for read records
-		let userUsername: string | null = null;
-		if (messageIdsToMarkAsRead.length > 0) {
-			const user = await prisma.user.findUnique({
-				where: { id: userId },
-				select: { username: true },
-			});
-			userUsername = user?.username || null;
-
-			// Get existing read records
-			const existingReads = await prisma.messageRead.findMany({
-				where: {
-					messageId: { in: messageIdsToMarkAsRead },
-					userId,
-					deletedAt: null,
-				},
-				select: {
-					messageId: true,
-				},
-			});
-
-			const existingReadMessageIds = new Set(existingReads.map(r => r.messageId));
-
-			// Create read records for messages that haven't been read yet
-			const messagesToCreateRead = messageIdsToMarkAsRead.filter(
-				id => !existingReadMessageIds.has(id),
-			);
-
-			if (messagesToCreateRead.length > 0) {
-				await prisma.messageRead.createMany({
-					data: messagesToCreateRead.map(messageId => ({
-						messageId,
-						userId,
-						createdBy: userId,
-					})),
-					skipDuplicates: true,
+			// Oznacz jako przeczytane tylko jeśli to nie jest własna wiadomość użytkownika
+			if (newestMessage.senderId !== userId) {
+				await prisma.chatUser.update({
+					where: {
+						userId_chatId: {
+							userId,
+							chatId,
+						},
+					},
+					data: {
+						lastReadMessageId: newestMessage.id,
+						lastReadAt: new Date(),
+					},
 				});
-
-				// Add newly created read records to the messages
-				if (userUsername) {
-					const now = new Date();
-					messagesToReturn.forEach(message => {
-						if (messagesToCreateRead.includes(message.id)) {
-							message.reads.push({
-								id: '',
-								messageId: message.id,
-								userId,
-								readAt: now,
-								deletedAt: null,
-								createdBy: userId,
-								updatedBy: null,
-								user: {
-									username: userUsername!,
-								},
-							});
-						}
-					});
-				}
 			}
 		}
+
+		// Pobierz lastReadMessageId dla użytkownika (do zwrócenia na frontend)
+		const chatUserWithLastRead = await prisma.chatUser.findUnique({
+			where: {
+				userId_chatId: {
+					userId,
+					chatId,
+				},
+			},
+			select: {
+				lastReadMessageId: true,
+			},
+		});
 
 		// Get total count of messages
 		const total = await prisma.message.count({
@@ -221,6 +190,7 @@ export class MessageService {
 			messages: formattedMessages,
 			total,
 			hasMore,
+			lastReadMessageId: chatUserWithLastRead?.lastReadMessageId || null,
 		};
 	}
 
@@ -403,7 +373,9 @@ export class MessageService {
 		const tenMinutesInMs = 10 * 60 * 1000;
 
 		if (messageAge > tenMinutesInMs) {
-			throw new Error('Message is too old to be edited. You can only edit messages within 10 minutes of creation.');
+			throw new Error(
+				'Message is too old to be edited. You can only edit messages within 10 minutes of creation.',
+			);
 		}
 
 		// Update the message
@@ -810,36 +782,44 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// Check if read record already exists
-		const existingRead = await prisma.messageRead.findFirst({
+		// Don't mark own messages as read
+		if (message.senderId === userId) {
+			return;
+		}
+
+		// Get current lastReadMessage to check if we need to update
+		const currentChatUser = await prisma.chatUser.findUnique({
 			where: {
-				messageId,
-				userId,
+				userId_chatId: {
+					userId,
+					chatId: message.chatId,
+				},
+			},
+			select: {
+				lastReadMessage: {
+					select: {
+						createdAt: true,
+					},
+				},
 			},
 		});
 
-		if (existingRead) {
-			// If it was soft-deleted, restore it
-			if (existingRead.deletedAt) {
-				await prisma.messageRead.update({
-					where: {
-						id: existingRead.id,
+		// Update lastReadMessageId only if this message is newer than current lastReadMessage
+		const shouldUpdate =
+			!currentChatUser?.lastReadMessage ||
+			message.createdAt > currentChatUser.lastReadMessage.createdAt;
+
+		if (shouldUpdate) {
+			await prisma.chatUser.update({
+				where: {
+					userId_chatId: {
+						userId,
+						chatId: message.chatId,
 					},
-					data: {
-						deletedAt: null,
-						readAt: new Date(),
-						updatedBy: userId,
-					},
-				});
-			}
-			// If already marked as read, do nothing
-		} else {
-			// Create new read record
-			await prisma.messageRead.create({
+				},
 				data: {
-					messageId,
-					userId,
-					createdBy: userId,
+					lastReadMessageId: messageId,
+					lastReadAt: new Date(),
 				},
 			});
 		}
