@@ -5,6 +5,7 @@ export interface MessageResponse {
 	senderUsername: string;
 	content: string;
 	wasUpdated: boolean;
+	editedAt: Date | null;
 	createdAt: Date;
 	updatedAt: Date;
 	replyTo?: {

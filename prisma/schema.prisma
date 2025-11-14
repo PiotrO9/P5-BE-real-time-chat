@@ -95,6 +95,7 @@ model Message {
   senderId    String
   content     String
   wasUpdated  Boolean           @default(false)
+  editedAt    DateTime?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   deletedAt   DateTime?

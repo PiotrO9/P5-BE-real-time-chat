@@ -1,5 +1,7 @@
 version: '3.8'
 
+# Dodać pgAdmin jako dodatkowy serwis do docker-compose.yml
+
 services:
  postgres:
   image: postgres:15-alpine

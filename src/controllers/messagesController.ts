@@ -187,6 +187,10 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
 				ResponseHelper.notFound(res, error.message);
 				return;
 			}
+			if (error.message.includes('too old to be edited')) {
+				ResponseHelper.error(res, error.message, 400);
+				return;
+			}
 		}
 		next(error);
 	}

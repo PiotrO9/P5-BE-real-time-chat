@@ -197,6 +197,7 @@ export class MessageService {
 				senderUsername: message.sender.username,
 				content: message.content,
 				wasUpdated: message.wasUpdated,
+				editedAt: message.editedAt,
 				createdAt: message.createdAt,
 				updatedAt: message.updatedAt,
 				replyTo: message.replyTo
@@ -359,6 +360,7 @@ export class MessageService {
 			senderUsername: message.sender.username,
 			content: message.content,
 			wasUpdated: message.wasUpdated,
+			editedAt: message.editedAt,
 			createdAt: message.createdAt,
 			updatedAt: message.updatedAt,
 			replyTo: message.replyTo
@@ -395,6 +397,15 @@ export class MessageService {
 			throw new Error('Message not found or you are not the sender');
 		}
 
+		// Check if message is older than 10 minutes
+		const now = new Date();
+		const messageAge = now.getTime() - message.createdAt.getTime();
+		const tenMinutesInMs = 10 * 60 * 1000;
+
+		if (messageAge > tenMinutesInMs) {
+			throw new Error('Message is too old to be edited. You can only edit messages within 10 minutes of creation.');
+		}
+
 		// Update the message
 		const updatedMessage = await prisma.message.update({
 			where: {
@@ -403,6 +414,7 @@ export class MessageService {
 			data: {
 				content,
 				wasUpdated: true,
+				editedAt: now,
 				updatedBy: userId,
 			},
 			include: {
@@ -482,6 +494,7 @@ export class MessageService {
 			senderUsername: updatedMessage.sender.username,
 			content: updatedMessage.content,
 			wasUpdated: updatedMessage.wasUpdated,
+			editedAt: updatedMessage.editedAt,
 			createdAt: updatedMessage.createdAt,
 			updatedAt: updatedMessage.updatedAt,
 			replyTo: updatedMessage.replyTo
@@ -651,6 +664,7 @@ export class MessageService {
 				senderUsername: reply.sender.username,
 				content: reply.content,
 				wasUpdated: reply.wasUpdated,
+				editedAt: reply.editedAt,
 				createdAt: reply.createdAt,
 				updatedAt: reply.updatedAt,
 				replyTo: reply.replyTo
