@@ -1,7 +1,5 @@
 version: '3.8'
 
-# Dodać pgAdmin jako dodatkowy serwis do docker-compose.yml
-
 services:
  postgres:
   image: postgres:15-alpine
@@ -52,8 +50,29 @@ services:
    retries: 3
    start_period: 40s
 
+ pgadmin:
+  image: dpage/pgadmin4:latest
+  container_name: real_time_chat_pgadmin
+  env_file:
+   - .env
+  environment:
+   PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
+   PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+   PGADMIN_CONFIG_SERVER_MODE: 'False'
+   PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+  ports:
+   - '5050:80'
+  depends_on:
+   postgres:
+    condition: service_healthy
+  networks:
+   - real_time_chat_network
+  volumes:
+   - pgadmin_data:/var/lib/pgadmin
+
 volumes:
  pgdata:
+ pgadmin_data:
 
 networks:
  real_time_chat_network:
