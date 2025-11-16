@@ -13,7 +13,6 @@ export class MessageService {
 		limit: number = 50,
 		offset: number = 0,
 	): Promise<MessagesListResponse> {
-		// Check if user is a member of this chat
 		const chatUser = await prisma.chatUser.findFirst({
 			where: {
 				userId,
@@ -26,7 +25,6 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// Get messages from the chat (najnowsze pierwsze)
 		const messages = await prisma.message.findMany({
 			where: {
 				chatId,
@@ -75,21 +73,18 @@ export class MessageService {
 				},
 			},
 			orderBy: {
-				createdAt: 'desc', // Najnowsze pierwsze
+				createdAt: 'asc',
 			},
 			skip: offset,
-			take: limit + 1, // Take one more to check if there are more messages
+			take: limit + 1,
 		});
 
 		const hasMore = messages.length > limit;
 		const messagesToReturn = hasMore ? messages.slice(0, limit) : messages;
 
-		// Znajdź najnowszą wiadomość (pierwsza w tablicy, bo sort desc)
-		// i zaktualizuj lastReadMessageId w ChatUser
 		if (messagesToReturn.length > 0) {
-			const newestMessage = messagesToReturn[0];
+			const newestMessage = messagesToReturn[messagesToReturn.length - 1];
 
-			// Oznacz jako przeczytane tylko jeśli to nie jest własna wiadomość użytkownika
 			if (newestMessage.senderId !== userId) {
 				await prisma.chatUser.update({
 					where: {
@@ -106,7 +101,6 @@ export class MessageService {
 			}
 		}
 
-		// Pobierz lastReadMessageId dla użytkownika (do zwrócenia na frontend)
 		const chatUserWithLastRead = await prisma.chatUser.findUnique({
 			where: {
 				userId_chatId: {
@@ -119,7 +113,6 @@ export class MessageService {
 			},
 		});
 
-		// Get total count of messages
 		const total = await prisma.message.count({
 			where: {
 				chatId,
@@ -127,7 +120,6 @@ export class MessageService {
 			},
 		});
 
-		// Get all pinned messages for this chat
 		const pinnedMessages = await prisma.pinnedMessage.findMany({
 			where: {
 				chatId,
@@ -140,9 +132,7 @@ export class MessageService {
 
 		const pinnedMessageIds = new Set(pinnedMessages.map(pm => pm.messageId));
 
-		// Format messages
 		const formattedMessages: MessageResponse[] = messagesToReturn.map(message => {
-			// Group reactions by emoji
 			const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
 
 			message.reactions.forEach(reaction => {
@@ -203,7 +193,6 @@ export class MessageService {
 		content: string,
 		replyToId?: string,
 	): Promise<MessageResponse> {
-		// Check if user is a member of this chat
 		const chatUser = await prisma.chatUser.findFirst({
 			where: {
 				userId,
@@ -216,7 +205,6 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// If replyToId is provided, check if the message exists in this chat
 		if (replyToId) {
 			const replyToMessage = await prisma.message.findFirst({
 				where: {
@@ -231,7 +219,6 @@ export class MessageService {
 			}
 		}
 
-		// Create the message
 		const createdMessage = await prisma.message.create({
 			data: {
 				chatId,
@@ -242,18 +229,16 @@ export class MessageService {
 			},
 		});
 
-		// Update chat's updatedAt timestamp
 		await prisma.chat.update({
 			where: {
 				id: chatId,
 			},
 			data: {
 				updatedBy: userId,
-				updatedAt: new Date(), // Explicitly update to ensure timestamp is refreshed
+				updatedAt: new Date(),
 			},
 		});
 
-		// Fetch the message with all relations to ensure consistency with getMessages
 		const message = await prisma.message.findUnique({
 			where: {
 				id: createdMessage.id,
@@ -306,7 +291,6 @@ export class MessageService {
 			throw new Error('Failed to retrieve created message');
 		}
 
-		// Group reactions by emoji
 		const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
 
 		message.reactions.forEach(reaction => {
@@ -346,7 +330,7 @@ export class MessageService {
 				username: read.user.username,
 				readAt: read.readAt,
 			})),
-			isPinned: false, // New message cannot be pinned immediately
+			isPinned: false,
 		};
 	}
 
@@ -354,7 +338,6 @@ export class MessageService {
 	 * Edits a message
 	 */
 	async editMessage(userId: string, messageId: string, content: string): Promise<MessageResponse> {
-		// Check if message exists and belongs to the user
 		const message = await prisma.message.findFirst({
 			where: {
 				id: messageId,
@@ -367,7 +350,6 @@ export class MessageService {
 			throw new Error('Message not found or you are not the sender');
 		}
 
-		// Check if message is older than 10 minutes
 		const now = new Date();
 		const messageAge = now.getTime() - message.createdAt.getTime();
 		const tenMinutesInMs = 10 * 60 * 1000;
@@ -378,7 +360,6 @@ export class MessageService {
 			);
 		}
 
-		// Update the message
 		const updatedMessage = await prisma.message.update({
 			where: {
 				id: messageId,
@@ -433,7 +414,6 @@ export class MessageService {
 			},
 		});
 
-		// Check if message is pinned
 		const pinnedMessage = await prisma.pinnedMessage.findFirst({
 			where: {
 				chatId: updatedMessage.chatId,
@@ -442,7 +422,6 @@ export class MessageService {
 			},
 		});
 
-		// Group reactions by emoji
 		const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
 
 		updatedMessage.reactions.forEach(reaction => {
@@ -490,7 +469,6 @@ export class MessageService {
 	 * Deletes a message (soft delete)
 	 */
 	async deleteMessage(userId: string, messageId: string): Promise<void> {
-		// Check if message exists and belongs to the user
 		const message = await prisma.message.findFirst({
 			where: {
 				id: messageId,
@@ -503,7 +481,6 @@ export class MessageService {
 			throw new Error('Message not found or you are not the sender');
 		}
 
-		// Soft delete the message
 		await prisma.message.update({
 			where: {
 				id: messageId,
@@ -519,7 +496,6 @@ export class MessageService {
 	 * Gets replies to a message
 	 */
 	async getMessageReplies(userId: string, messageId: string): Promise<MessageResponse[]> {
-		// Check if message exists
 		const message = await prisma.message.findFirst({
 			where: {
 				id: messageId,
@@ -531,7 +507,6 @@ export class MessageService {
 			throw new Error('Message not found');
 		}
 
-		// Check if user is a member of the chat
 		const chatUser = await prisma.chatUser.findFirst({
 			where: {
 				userId,
@@ -544,7 +519,6 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// Get replies
 		const replies = await prisma.message.findMany({
 			where: {
 				replyToId: messageId,
@@ -597,7 +571,6 @@ export class MessageService {
 			},
 		});
 
-		// Get all pinned messages for this chat
 		const pinnedMessages = await prisma.pinnedMessage.findMany({
 			where: {
 				chatId: message.chatId,
@@ -610,9 +583,7 @@ export class MessageService {
 
 		const pinnedMessageIds = new Set(pinnedMessages.map(pm => pm.messageId));
 
-		// Format replies
 		return replies.map(reply => {
-			// Group reactions by emoji
 			const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
 
 			reply.reactions.forEach(reaction => {
@@ -661,7 +632,6 @@ export class MessageService {
 	 * Adds a reaction to a message
 	 */
 	async addMessageReaction(userId: string, messageId: string, emoji: string): Promise<void> {
-		// Check if message exists
 		const message = await prisma.message.findFirst({
 			where: {
 				id: messageId,
@@ -673,7 +643,6 @@ export class MessageService {
 			throw new Error('Message not found');
 		}
 
-		// Check if user is a member of the chat
 		const chatUser = await prisma.chatUser.findFirst({
 			where: {
 				userId,
@@ -686,7 +655,6 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// Check if reaction already exists
 		const existingReaction = await prisma.messageReaction.findFirst({
 			where: {
 				messageId,
@@ -696,7 +664,6 @@ export class MessageService {
 		});
 
 		if (existingReaction) {
-			// If it was soft-deleted, restore it
 			if (existingReaction.deletedAt) {
 				await prisma.messageReaction.update({
 					where: {
@@ -711,7 +678,6 @@ export class MessageService {
 				throw new Error('You have already reacted with this emoji');
 			}
 		} else {
-			// Create new reaction
 			await prisma.messageReaction.create({
 				data: {
 					messageId,
@@ -727,7 +693,6 @@ export class MessageService {
 	 * Removes a reaction from a message
 	 */
 	async deleteMessageReaction(userId: string, messageId: string, emoji: string): Promise<void> {
-		// Check if reaction exists
 		const reaction = await prisma.messageReaction.findFirst({
 			where: {
 				messageId,
@@ -741,7 +706,6 @@ export class MessageService {
 			throw new Error('Reaction not found');
 		}
 
-		// Soft delete the reaction
 		await prisma.messageReaction.update({
 			where: {
 				id: reaction.id,
@@ -757,7 +721,6 @@ export class MessageService {
 	 * Marks a message as read
 	 */
 	async markMessageAsRead(userId: string, messageId: string): Promise<void> {
-		// Check if message exists
 		const message = await prisma.message.findFirst({
 			where: {
 				id: messageId,
@@ -769,7 +732,6 @@ export class MessageService {
 			throw new Error('Message not found');
 		}
 
-		// Check if user is a member of the chat
 		const chatUser = await prisma.chatUser.findFirst({
 			where: {
 				userId,
@@ -782,12 +744,10 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// Don't mark own messages as read
 		if (message.senderId === userId) {
 			return;
 		}
 
-		// Get current lastReadMessage to check if we need to update
 		const currentChatUser = await prisma.chatUser.findUnique({
 			where: {
 				userId_chatId: {
@@ -804,7 +764,6 @@ export class MessageService {
 			},
 		});
 
-		// Update lastReadMessageId only if this message is newer than current lastReadMessage
 		const shouldUpdate =
 			!currentChatUser?.lastReadMessage ||
 			message.createdAt > currentChatUser.lastReadMessage.createdAt;
@@ -832,7 +791,6 @@ export class MessageService {
 		userId: string,
 		messageId: string,
 	): Promise<{ userId: string; username: string; readAt: Date }[]> {
-		// Check if message exists
 		const message = await prisma.message.findFirst({
 			where: {
 				id: messageId,
@@ -844,7 +802,6 @@ export class MessageService {
 			throw new Error('Message not found');
 		}
 
-		// Check if user is a member of the chat
 		const chatUser = await prisma.chatUser.findFirst({
 			where: {
 				userId,
@@ -857,7 +814,6 @@ export class MessageService {
 			throw new Error('Chat not found or you are not a member of this chat');
 		}
 
-		// Get all reads for this message
 		const reads = await prisma.messageRead.findMany({
 			where: {
 				messageId,
