@@ -5,6 +5,43 @@ const prisma = new PrismaClient();
 
 export class MessageService {
 	/**
+	 * Helper method to filter reads to only include users for whom this is their latest read message
+	 */
+	private async filterLatestReads(
+		chatId: string,
+		messageId: string,
+		reads: Array<{ userId: string; username: string; readAt: Date }>,
+		chatUsersCache?: Array<{ userId: string; lastReadMessageId: string | null }>,
+	): Promise<Array<{ userId: string; username: string; readAt: Date }>> {
+		// Get all chat users with their last read message IDs (use cache if provided)
+		let chatUsers: Array<{ userId: string; lastReadMessageId: string | null }>;
+		if (chatUsersCache) {
+			chatUsers = chatUsersCache;
+		} else {
+			chatUsers = await prisma.chatUser.findMany({
+				where: {
+					chatId,
+					deletedAt: null,
+				},
+				select: {
+					userId: true,
+					lastReadMessageId: true,
+				},
+			});
+		}
+
+		// Create a set of userIds for whom this is their latest read message
+		const latestReadUserIds = new Set<string>();
+		chatUsers.forEach(chatUser => {
+			if (chatUser.lastReadMessageId === messageId) {
+				latestReadUserIds.add(chatUser.userId);
+			}
+		});
+
+		// Filter reads to only show users who have this as their latest read message
+		return reads.filter(read => latestReadUserIds.has(read.userId));
+	}
+	/**
 	 * Gets messages from a chat with pagination
 	 */
 	async getMessages(
@@ -86,6 +123,8 @@ export class MessageService {
 			const newestMessage = messagesToReturn[messagesToReturn.length - 1];
 
 			if (newestMessage.senderId !== userId) {
+				const readAt = new Date();
+
 				await prisma.chatUser.update({
 					where: {
 						userId_chatId: {
@@ -95,7 +134,28 @@ export class MessageService {
 					},
 					data: {
 						lastReadMessageId: newestMessage.id,
-						lastReadAt: new Date(),
+						lastReadAt: readAt,
+					},
+				});
+
+				// Create or update MessageRead record for the newest message
+				await prisma.messageRead.upsert({
+					where: {
+						messageId_userId: {
+							messageId: newestMessage.id,
+							userId,
+						},
+					},
+					create: {
+						messageId: newestMessage.id,
+						userId,
+						readAt,
+						createdBy: userId,
+					},
+					update: {
+						readAt,
+						deletedAt: null,
+						updatedBy: userId,
 					},
 				});
 			}
@@ -132,49 +192,67 @@ export class MessageService {
 
 		const pinnedMessageIds = new Set(pinnedMessages.map(pm => pm.messageId));
 
-		const formattedMessages: MessageResponse[] = messagesToReturn.map(message => {
-			const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
+		// Get all chat users with their last read message IDs (for filtering reads)
+		const chatUsers = await prisma.chatUser.findMany({
+			where: {
+				chatId,
+				deletedAt: null,
+			},
+			select: {
+				userId: true,
+				lastReadMessageId: true,
+			},
+		});
 
-			message.reactions.forEach(reaction => {
-				const existing = reactionsMap.get(reaction.emoji);
-				if (existing) {
-					existing.count++;
-					existing.userIds.push(reaction.user.id);
-				} else {
-					reactionsMap.set(reaction.emoji, {
-						emoji: reaction.emoji,
-						count: 1,
-						userIds: [reaction.user.id],
-					});
-				}
-			});
+		const formattedMessages: MessageResponse[] = await Promise.all(
+			messagesToReturn.map(async message => {
+				const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
 
-			return {
-				id: message.id,
-				chatId: message.chatId,
-				senderId: message.senderId,
-				senderUsername: message.sender.username,
-				content: message.content,
-				wasUpdated: message.wasUpdated,
-				editedAt: message.editedAt,
-				createdAt: message.createdAt,
-				updatedAt: message.updatedAt,
-				replyTo: message.replyTo
-					? {
-							id: message.replyTo.id,
-							content: message.replyTo.content,
-							senderUsername: message.replyTo.sender.username,
-					  }
-					: null,
-				reactions: Array.from(reactionsMap.values()),
-				reads: message.reads.map(read => ({
+				message.reactions.forEach(reaction => {
+					const existing = reactionsMap.get(reaction.emoji);
+					if (existing) {
+						existing.count++;
+						existing.userIds.push(reaction.user.id);
+					} else {
+						reactionsMap.set(reaction.emoji, {
+							emoji: reaction.emoji,
+							count: 1,
+							userIds: [reaction.user.id],
+						});
+					}
+				});
+
+				// Filter reads to only show users who have this as their latest read message
+				const readsData = message.reads.map(read => ({
 					userId: read.userId,
 					username: read.user.username,
 					readAt: read.readAt,
-				})),
-				isPinned: pinnedMessageIds.has(message.id),
-			};
-		});
+				}));
+				const filteredReads = await this.filterLatestReads(chatId, message.id, readsData, chatUsers);
+
+				return {
+					id: message.id,
+					chatId: message.chatId,
+					senderId: message.senderId,
+					senderUsername: message.sender.username,
+					content: message.content,
+					wasUpdated: message.wasUpdated,
+					editedAt: message.editedAt,
+					createdAt: message.createdAt,
+					updatedAt: message.updatedAt,
+					replyTo: message.replyTo
+						? {
+								id: message.replyTo.id,
+								content: message.replyTo.content,
+								senderUsername: message.replyTo.sender.username,
+						  }
+						: null,
+					reactions: Array.from(reactionsMap.values()),
+					reads: filteredReads.length > 0 ? filteredReads : undefined,
+					isPinned: pinnedMessageIds.has(message.id),
+				};
+			}),
+		);
 
 		return {
 			messages: formattedMessages,
@@ -307,6 +385,13 @@ export class MessageService {
 			}
 		});
 
+		const readsData = message.reads.map(read => ({
+			userId: read.userId,
+			username: read.user.username,
+			readAt: read.readAt,
+		}));
+		const filteredReads = await this.filterLatestReads(message.chatId, message.id, readsData);
+
 		return {
 			id: message.id,
 			chatId: message.chatId,
@@ -325,11 +410,7 @@ export class MessageService {
 				  }
 				: null,
 			reactions: Array.from(reactionsMap.values()),
-			reads: message.reads.map(read => ({
-				userId: read.userId,
-				username: read.user.username,
-				readAt: read.readAt,
-			})),
+			reads: filteredReads.length > 0 ? filteredReads : undefined,
 			isPinned: false,
 		};
 	}
@@ -438,6 +519,17 @@ export class MessageService {
 			}
 		});
 
+		const readsData = updatedMessage.reads.map(read => ({
+			userId: read.userId,
+			username: read.user.username,
+			readAt: read.readAt,
+		}));
+		const filteredReads = await this.filterLatestReads(
+			updatedMessage.chatId,
+			updatedMessage.id,
+			readsData,
+		);
+
 		return {
 			id: updatedMessage.id,
 			chatId: updatedMessage.chatId,
@@ -456,11 +548,7 @@ export class MessageService {
 				  }
 				: null,
 			reactions: Array.from(reactionsMap.values()),
-			reads: updatedMessage.reads.map(read => ({
-				userId: read.userId,
-				username: read.user.username,
-				readAt: read.readAt,
-			})),
+			reads: filteredReads.length > 0 ? filteredReads : undefined,
 			isPinned: !!pinnedMessage,
 		};
 	}
@@ -583,49 +671,56 @@ export class MessageService {
 
 		const pinnedMessageIds = new Set(pinnedMessages.map(pm => pm.messageId));
 
-		return replies.map(reply => {
-			const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
+		const formattedReplies = await Promise.all(
+			replies.map(async reply => {
+				const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
 
-			reply.reactions.forEach(reaction => {
-				const existing = reactionsMap.get(reaction.emoji);
-				if (existing) {
-					existing.count++;
-					existing.userIds.push(reaction.user.id);
-				} else {
-					reactionsMap.set(reaction.emoji, {
-						emoji: reaction.emoji,
-						count: 1,
-						userIds: [reaction.user.id],
-					});
-				}
-			});
+				reply.reactions.forEach(reaction => {
+					const existing = reactionsMap.get(reaction.emoji);
+					if (existing) {
+						existing.count++;
+						existing.userIds.push(reaction.user.id);
+					} else {
+						reactionsMap.set(reaction.emoji, {
+							emoji: reaction.emoji,
+							count: 1,
+							userIds: [reaction.user.id],
+						});
+					}
+				});
 
-			return {
-				id: reply.id,
-				chatId: reply.chatId,
-				senderId: reply.senderId,
-				senderUsername: reply.sender.username,
-				content: reply.content,
-				wasUpdated: reply.wasUpdated,
-				editedAt: reply.editedAt,
-				createdAt: reply.createdAt,
-				updatedAt: reply.updatedAt,
-				replyTo: reply.replyTo
-					? {
-							id: reply.replyTo.id,
-							content: reply.replyTo.content,
-							senderUsername: reply.replyTo.sender.username,
-					  }
-					: null,
-				reactions: Array.from(reactionsMap.values()),
-				reads: reply.reads.map(read => ({
+				const readsData = reply.reads.map(read => ({
 					userId: read.userId,
 					username: read.user.username,
 					readAt: read.readAt,
-				})),
-				isPinned: pinnedMessageIds.has(reply.id),
-			};
-		});
+				}));
+				const filteredReads = await this.filterLatestReads(reply.chatId, reply.id, readsData);
+
+				return {
+					id: reply.id,
+					chatId: reply.chatId,
+					senderId: reply.senderId,
+					senderUsername: reply.sender.username,
+					content: reply.content,
+					wasUpdated: reply.wasUpdated,
+					editedAt: reply.editedAt,
+					createdAt: reply.createdAt,
+					updatedAt: reply.updatedAt,
+					replyTo: reply.replyTo
+						? {
+								id: reply.replyTo.id,
+								content: reply.replyTo.content,
+								senderUsername: reply.replyTo.sender.username,
+						  }
+						: null,
+					reactions: Array.from(reactionsMap.values()),
+					reads: filteredReads.length > 0 ? filteredReads : undefined,
+					isPinned: pinnedMessageIds.has(reply.id),
+				};
+			}),
+		);
+
+		return formattedReplies;
 	}
 
 	/**
@@ -769,6 +864,8 @@ export class MessageService {
 			message.createdAt > currentChatUser.lastReadMessage.createdAt;
 
 		if (shouldUpdate) {
+			const readAt = new Date();
+
 			await prisma.chatUser.update({
 				where: {
 					userId_chatId: {
@@ -778,7 +875,28 @@ export class MessageService {
 				},
 				data: {
 					lastReadMessageId: messageId,
-					lastReadAt: new Date(),
+					lastReadAt: readAt,
+				},
+			});
+
+			// Create or update MessageRead record
+			await prisma.messageRead.upsert({
+				where: {
+					messageId_userId: {
+						messageId,
+						userId,
+					},
+				},
+				create: {
+					messageId,
+					userId,
+					readAt,
+					createdBy: userId,
+				},
+				update: {
+					readAt,
+					deletedAt: null,
+					updatedBy: userId,
 				},
 			});
 		}
