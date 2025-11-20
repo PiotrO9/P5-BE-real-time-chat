@@ -230,6 +230,32 @@ export class MessageService {
 				}));
 				const filteredReads = await this.filterLatestReads(chatId, message.id, readsData, chatUsers);
 
+				// Get forwarded message info if exists
+				let forwardedFrom = null;
+				if (message.forwardedFromMessageId) {
+					const originalMessage = await prisma.message.findUnique({
+						where: { id: message.forwardedFromMessageId },
+						select: {
+							sender: {
+								select: {
+									username: true,
+								},
+							},
+							createdAt: true,
+						},
+					});
+
+					if (originalMessage) {
+						forwardedFrom = {
+							messageId: message.forwardedFromMessageId,
+							chatId: message.forwardedFromChatId || '',
+							chatName: message.forwardedFromChatName,
+							senderUsername: originalMessage.sender.username,
+							originalCreatedAt: originalMessage.createdAt,
+						};
+					}
+				}
+
 				return {
 					id: message.id,
 					chatId: message.chatId,
@@ -247,6 +273,7 @@ export class MessageService {
 								senderUsername: message.replyTo.sender.username,
 						  }
 						: null,
+					forwardedFrom,
 					reactions: Array.from(reactionsMap.values()),
 					reads: filteredReads.length > 0 ? filteredReads : undefined,
 					isPinned: pinnedMessageIds.has(message.id),
@@ -392,6 +419,32 @@ export class MessageService {
 		}));
 		const filteredReads = await this.filterLatestReads(message.chatId, message.id, readsData);
 
+		// Get forwarded message info if exists
+		let forwardedFrom = null;
+		if (message.forwardedFromMessageId) {
+			const originalMessage = await prisma.message.findUnique({
+				where: { id: message.forwardedFromMessageId },
+				select: {
+					sender: {
+						select: {
+							username: true,
+						},
+					},
+					createdAt: true,
+				},
+			});
+
+			if (originalMessage) {
+				forwardedFrom = {
+					messageId: message.forwardedFromMessageId,
+					chatId: message.forwardedFromChatId || '',
+					chatName: message.forwardedFromChatName,
+					senderUsername: originalMessage.sender.username,
+					originalCreatedAt: originalMessage.createdAt,
+				};
+			}
+		}
+
 		return {
 			id: message.id,
 			chatId: message.chatId,
@@ -407,6 +460,199 @@ export class MessageService {
 						id: message.replyTo.id,
 						content: message.replyTo.content,
 						senderUsername: message.replyTo.sender.username,
+				  }
+				: null,
+			forwardedFrom,
+			reactions: Array.from(reactionsMap.values()),
+			reads: filteredReads.length > 0 ? filteredReads : undefined,
+			isPinned: false,
+		};
+	}
+
+	/**
+	 * Forwards a message to another chat
+	 */
+	async forwardMessage(
+		userId: string,
+		targetChatId: string,
+		originalMessageId: string,
+	): Promise<MessageResponse> {
+		// Check if user is a member of the target chat
+		const targetChatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId: targetChatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!targetChatUser) {
+			throw new Error('Target chat not found or you are not a member of this chat');
+		}
+
+		// Get the original message with its chat and sender information
+		const originalMessage = await prisma.message.findFirst({
+			where: {
+				id: originalMessageId,
+				deletedAt: null,
+			},
+			include: {
+				chat: {
+					select: {
+						id: true,
+						name: true,
+						isGroup: true,
+					},
+				},
+				sender: {
+					select: {
+						id: true,
+						username: true,
+					},
+				},
+			},
+		});
+
+		if (!originalMessage) {
+			throw new Error('Original message not found');
+		}
+
+		// Check if user has access to the original message's chat
+		const originalChatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId: originalMessage.chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!originalChatUser) {
+			throw new Error('You do not have access to the original message');
+		}
+
+		// Create forwarded message
+		const forwardedMessage = await prisma.message.create({
+			data: {
+				chatId: targetChatId,
+				senderId: userId,
+				content: originalMessage.content,
+				forwardedFromMessageId: originalMessage.id,
+				forwardedFromChatId: originalMessage.chatId,
+				forwardedFromChatName: originalMessage.chat.isGroup ? originalMessage.chat.name : null,
+				createdBy: userId,
+			},
+		});
+
+		await prisma.chat.update({
+			where: {
+				id: targetChatId,
+			},
+			data: {
+				updatedBy: userId,
+				updatedAt: new Date(),
+			},
+		});
+
+		// Get the full message with all relations
+		const message = await prisma.message.findUnique({
+			where: {
+				id: forwardedMessage.id,
+			},
+			include: {
+				sender: {
+					select: {
+						username: true,
+					},
+				},
+				replyTo: {
+					select: {
+						id: true,
+						content: true,
+						sender: {
+							select: {
+								username: true,
+							},
+						},
+					},
+				},
+				reactions: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								id: true,
+							},
+						},
+					},
+				},
+				reads: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								username: true,
+							},
+						},
+					},
+				},
+			},
+		});
+
+		if (!message) {
+			throw new Error('Failed to retrieve created message');
+		}
+
+		const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
+
+		message.reactions.forEach(reaction => {
+			const existing = reactionsMap.get(reaction.emoji);
+			if (existing) {
+				existing.count++;
+				existing.userIds.push(reaction.user.id);
+			} else {
+				reactionsMap.set(reaction.emoji, {
+					emoji: reaction.emoji,
+					count: 1,
+					userIds: [reaction.user.id],
+				});
+			}
+		});
+
+		const readsData = message.reads.map(read => ({
+			userId: read.userId,
+			username: read.user.username,
+			readAt: read.readAt,
+		}));
+		const filteredReads = await this.filterLatestReads(message.chatId, message.id, readsData);
+
+		return {
+			id: message.id,
+			chatId: message.chatId,
+			senderId: message.senderId,
+			senderUsername: message.sender.username,
+			content: message.content,
+			wasUpdated: message.wasUpdated,
+			editedAt: message.editedAt,
+			createdAt: message.createdAt,
+			updatedAt: message.updatedAt,
+			replyTo: message.replyTo
+				? {
+						id: message.replyTo.id,
+						content: message.replyTo.content,
+						senderUsername: message.replyTo.sender.username,
+				  }
+				: null,
+			forwardedFrom: message.forwardedFromMessageId
+				? {
+						messageId: message.forwardedFromMessageId,
+						chatId: message.forwardedFromChatId || '',
+						chatName: message.forwardedFromChatName,
+						senderUsername: originalMessage.sender.username,
+						originalCreatedAt: originalMessage.createdAt,
 				  }
 				: null,
 			reactions: Array.from(reactionsMap.values()),
@@ -530,6 +776,32 @@ export class MessageService {
 			readsData,
 		);
 
+		// Get forwarded message info if exists
+		let forwardedFrom = null;
+		if (updatedMessage.forwardedFromMessageId) {
+			const originalMessage = await prisma.message.findUnique({
+				where: { id: updatedMessage.forwardedFromMessageId },
+				select: {
+					sender: {
+						select: {
+							username: true,
+						},
+					},
+					createdAt: true,
+				},
+			});
+
+			if (originalMessage) {
+				forwardedFrom = {
+					messageId: updatedMessage.forwardedFromMessageId,
+					chatId: updatedMessage.forwardedFromChatId || '',
+					chatName: updatedMessage.forwardedFromChatName,
+					senderUsername: originalMessage.sender.username,
+					originalCreatedAt: originalMessage.createdAt,
+				};
+			}
+		}
+
 		return {
 			id: updatedMessage.id,
 			chatId: updatedMessage.chatId,
@@ -547,6 +819,7 @@ export class MessageService {
 						senderUsername: updatedMessage.replyTo.sender.username,
 				  }
 				: null,
+			forwardedFrom,
 			reactions: Array.from(reactionsMap.values()),
 			reads: filteredReads.length > 0 ? filteredReads : undefined,
 			isPinned: !!pinnedMessage,
@@ -696,6 +969,32 @@ export class MessageService {
 				}));
 				const filteredReads = await this.filterLatestReads(reply.chatId, reply.id, readsData);
 
+				// Get forwarded message info if exists
+				let forwardedFrom = null;
+				if (reply.forwardedFromMessageId) {
+					const originalMessage = await prisma.message.findUnique({
+						where: { id: reply.forwardedFromMessageId },
+						select: {
+							sender: {
+								select: {
+									username: true,
+								},
+							},
+							createdAt: true,
+						},
+					});
+
+					if (originalMessage) {
+						forwardedFrom = {
+							messageId: reply.forwardedFromMessageId,
+							chatId: reply.forwardedFromChatId || '',
+							chatName: reply.forwardedFromChatName,
+							senderUsername: originalMessage.sender.username,
+							originalCreatedAt: originalMessage.createdAt,
+						};
+					}
+				}
+
 				return {
 					id: reply.id,
 					chatId: reply.chatId,
@@ -713,6 +1012,7 @@ export class MessageService {
 								senderUsername: reply.replyTo.sender.username,
 						  }
 						: null,
+					forwardedFrom,
 					reactions: Array.from(reactionsMap.values()),
 					reads: filteredReads.length > 0 ? filteredReads : undefined,
 					isPinned: pinnedMessageIds.has(reply.id),

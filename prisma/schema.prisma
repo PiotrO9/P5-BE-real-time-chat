@@ -112,6 +112,11 @@ model Message {
   replyToId   String?
   replies     Message[]         @relation("MessageReplies")
 
+  // forwarded message information
+  forwardedFromMessageId String?
+  forwardedFromChatId    String?
+  forwardedFromChatName  String?
+
   reactions   MessageReaction[]
   reads       MessageRead[]
   pinnedMessages PinnedMessage[]

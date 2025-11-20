@@ -13,6 +13,13 @@ export interface MessageResponse {
 		content: string;
 		senderUsername: string;
 	} | null;
+	forwardedFrom?: {
+		messageId: string;
+		chatId: string;
+		chatName: string | null;
+		senderUsername: string;
+		originalCreatedAt: Date;
+	} | null;
 	reactions?: {
 		emoji: string;
 		count: number;

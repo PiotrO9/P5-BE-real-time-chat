@@ -124,3 +124,7 @@ export const getMessagesQuerySchema = z.object({
 export const addMessageReactionSchema = z.object({
 	emoji: z.string().min(1, 'Emoji is required').max(10, 'Emoji must be less than 10 characters'),
 });
+
+export const forwardMessageSchema = z.object({
+	messageId: z.string().uuid('Invalid message ID'),
+});

@@ -6,6 +6,7 @@ import {
 	sendMessageSchema,
 	editMessageSchema,
 	addMessageReactionSchema,
+	forwardMessageSchema,
 } from '../utils/validationSchemas';
 import {
 	emitNewMessage,
@@ -468,6 +469,62 @@ export async function getMessageReaders(req: Request, res: Response, next: NextF
 			}
 			if (error.message === 'Chat not found or you are not a member of this chat') {
 				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
+		next(error);
+	}
+}
+
+/**
+ * Forward a message to another chat
+ * POST /api/messages/:chatId/forward
+ */
+export async function forwardMessage(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.user?.userId;
+
+		if (!userId) {
+			ResponseHelper.unauthorized(res);
+			return;
+		}
+
+		const { chatId } = req.params;
+
+		// Validate request body
+		const bodyValidation = forwardMessageSchema.safeParse(req.body);
+
+		if (!bodyValidation.success) {
+			const errors = bodyValidation.error.issues.map((err: any) => ({
+				field: err.path.join('.'),
+				message: err.message,
+			}));
+
+			ResponseHelper.validationError(res, errors);
+			return;
+		}
+
+		const { messageId } = bodyValidation.data;
+
+		// Forward message
+		const message = await messageService.forwardMessage(userId, chatId, messageId);
+
+		// Emit socket event to all chat members
+		emitNewMessage(chatId, message);
+
+		ResponseHelper.success(res, 'Message forwarded successfully', message, 201);
+	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Target chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'Original message not found') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+			if (error.message === 'You do not have access to the original message') {
+				ResponseHelper.forbidden(res, error.message);
 				return;
 			}
 		}

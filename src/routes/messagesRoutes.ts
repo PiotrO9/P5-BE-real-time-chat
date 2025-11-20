@@ -11,6 +11,7 @@ import {
 	deleteMessageReaction,
 	markMessageAsRead,
 	getMessageReaders,
+	forwardMessage,
 } from '../controllers/messagesController';
 
 const router = Router();
@@ -639,5 +640,97 @@ router.post('/:messageId/read', authenticateToken, markMessageAsRead);
  *         description: Internal server error
  */
 router.get('/:messageId/readers', authenticateToken, getMessageReaders);
+
+/**
+ * @openapi
+ * /api/messages/{chatId}/forward:
+ *   post:
+ *     summary: Forward a message to another chat
+ *     description: Forward a message from one chat to another, preserving information about the original message
+ *     tags:
+ *       - messages
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Target chat ID where the message will be forwarded
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - messageId
+ *             properties:
+ *               messageId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID of the message to forward
+ *     responses:
+ *       201:
+ *         description: Message forwarded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Message forwarded successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     chatId:
+ *                       type: string
+ *                       format: uuid
+ *                     senderId:
+ *                       type: string
+ *                       format: uuid
+ *                     content:
+ *                       type: string
+ *                     forwardedFrom:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         messageId:
+ *                           type: string
+ *                           format: uuid
+ *                         chatId:
+ *                           type: string
+ *                           format: uuid
+ *                         chatName:
+ *                           type: string
+ *                           nullable: true
+ *                         senderUsername:
+ *                           type: string
+ *                         originalCreatedAt:
+ *                           type: string
+ *                           format: date-time
+ *       400:
+ *         description: Bad request - validation error
+ *       403:
+ *         description: Forbidden - user does not have access to the original message
+ *       404:
+ *         description: Target chat or original message not found
+ *       401:
+ *         description: Unauthorized
+ *       429:
+ *         description: Too Many Requests - rate limit exceeded
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/:chatId/forward', authenticateToken, sendMessageRateLimiter, forwardMessage);
 
 export { router as messagesRoutes };
