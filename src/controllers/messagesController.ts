@@ -205,27 +205,13 @@ export async function deleteMessage(req: Request, res: Response, next: NextFunct
 
 		const { messageId } = req.params;
 
-		// Get message details before deletion (for chatId)
-		const message = await prisma.message.findFirst({
-			where: {
-				id: messageId,
-				senderId: userId,
-				deletedAt: null,
-			},
-			select: {
-				chatId: true,
-			},
-		});
-
-		// Delete message
-		await messageService.deleteMessage(userId, messageId);
+		// Delete message and get updated message
+		const deletedMessage = await messageService.deleteMessage(userId, messageId);
 
 		// Emit socket event to all chat members
-		if (message) {
-			emitMessageDeleted(message.chatId, messageId);
-		}
+		emitMessageDeleted(deletedMessage.chatId, messageId);
 
-		ResponseHelper.success(res, 'Message deleted successfully', null);
+		ResponseHelper.success(res, 'Message deleted successfully', deletedMessage);
 	} catch (error) {
 		if (error instanceof Error) {
 			if (error.message === 'Message not found or you are not the sender') {

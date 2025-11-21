@@ -65,7 +65,6 @@ export class MessageService {
 		const messages = await prisma.message.findMany({
 			where: {
 				chatId,
-				deletedAt: null,
 			},
 			include: {
 				sender: {
@@ -77,6 +76,7 @@ export class MessageService {
 					select: {
 						id: true,
 						content: true,
+						deletedAt: true,
 						sender: {
 							select: {
 								username: true,
@@ -122,7 +122,7 @@ export class MessageService {
 		if (messagesToReturn.length > 0) {
 			const newestMessage = messagesToReturn[messagesToReturn.length - 1];
 
-			if (newestMessage.senderId !== userId) {
+			if (newestMessage.senderId !== userId && newestMessage.deletedAt === null) {
 				const readAt = new Date();
 
 				await prisma.chatUser.update({
@@ -176,7 +176,6 @@ export class MessageService {
 		const total = await prisma.message.count({
 			where: {
 				chatId,
-				deletedAt: null,
 			},
 		});
 
@@ -256,12 +255,14 @@ export class MessageService {
 					}
 				}
 
+				const isDeleted = message.deletedAt !== null;
+
 				return {
 					id: message.id,
 					chatId: message.chatId,
 					senderId: message.senderId,
 					senderUsername: message.sender.username,
-					content: message.content,
+					content: isDeleted ? '' : message.content,
 					wasUpdated: message.wasUpdated,
 					editedAt: message.editedAt,
 					createdAt: message.createdAt,
@@ -269,7 +270,7 @@ export class MessageService {
 					replyTo: message.replyTo
 						? {
 								id: message.replyTo.id,
-								content: message.replyTo.content,
+								content: message.replyTo.deletedAt ? '' : message.replyTo.content,
 								senderUsername: message.replyTo.sender.username,
 						  }
 						: null,
@@ -277,6 +278,7 @@ export class MessageService {
 					reactions: Array.from(reactionsMap.values()),
 					reads: filteredReads.length > 0 ? filteredReads : undefined,
 					isPinned: pinnedMessageIds.has(message.id),
+					isDeleted,
 				};
 			}),
 		);
@@ -358,6 +360,7 @@ export class MessageService {
 					select: {
 						id: true,
 						content: true,
+						deletedAt: true,
 						sender: {
 							select: {
 								username: true,
@@ -458,7 +461,7 @@ export class MessageService {
 			replyTo: message.replyTo
 				? {
 						id: message.replyTo.id,
-						content: message.replyTo.content,
+						content: message.replyTo.deletedAt ? '' : message.replyTo.content,
 						senderUsername: message.replyTo.sender.username,
 				  }
 				: null,
@@ -568,6 +571,7 @@ export class MessageService {
 					select: {
 						id: true,
 						content: true,
+						deletedAt: true,
 						sender: {
 							select: {
 								username: true,
@@ -642,7 +646,7 @@ export class MessageService {
 			replyTo: message.replyTo
 				? {
 						id: message.replyTo.id,
-						content: message.replyTo.content,
+						content: message.replyTo.deletedAt ? '' : message.replyTo.content,
 						senderUsername: message.replyTo.sender.username,
 				  }
 				: null,
@@ -707,6 +711,7 @@ export class MessageService {
 					select: {
 						id: true,
 						content: true,
+						deletedAt: true,
 						sender: {
 							select: {
 								username: true,
@@ -815,7 +820,7 @@ export class MessageService {
 			replyTo: updatedMessage.replyTo
 				? {
 						id: updatedMessage.replyTo.id,
-						content: updatedMessage.replyTo.content,
+						content: updatedMessage.replyTo.deletedAt ? '' : updatedMessage.replyTo.content,
 						senderUsername: updatedMessage.replyTo.sender.username,
 				  }
 				: null,
@@ -829,7 +834,7 @@ export class MessageService {
 	/**
 	 * Deletes a message (soft delete)
 	 */
-	async deleteMessage(userId: string, messageId: string): Promise<void> {
+	async deleteMessage(userId: string, messageId: string): Promise<MessageResponse> {
 		const message = await prisma.message.findFirst({
 			where: {
 				id: messageId,
@@ -851,6 +856,145 @@ export class MessageService {
 				updatedBy: userId,
 			},
 		});
+
+		// Get the full message with all relations
+		const deletedMessage = await prisma.message.findUnique({
+			where: {
+				id: messageId,
+			},
+			include: {
+				sender: {
+					select: {
+						username: true,
+					},
+				},
+				replyTo: {
+					select: {
+						id: true,
+						content: true,
+						deletedAt: true,
+						sender: {
+							select: {
+								username: true,
+							},
+						},
+					},
+				},
+				reactions: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								id: true,
+							},
+						},
+					},
+				},
+				reads: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								username: true,
+							},
+						},
+					},
+				},
+			},
+		});
+
+		if (!deletedMessage) {
+			throw new Error('Failed to retrieve deleted message');
+		}
+
+		const reactionsMap = new Map<string, { emoji: string; count: number; userIds: string[] }>();
+
+		deletedMessage.reactions.forEach(reaction => {
+			const existing = reactionsMap.get(reaction.emoji);
+			if (existing) {
+				existing.count++;
+				existing.userIds.push(reaction.user.id);
+			} else {
+				reactionsMap.set(reaction.emoji, {
+					emoji: reaction.emoji,
+					count: 1,
+					userIds: [reaction.user.id],
+				});
+			}
+		});
+
+		const readsData = deletedMessage.reads.map(read => ({
+			userId: read.userId,
+			username: read.user.username,
+			readAt: read.readAt,
+		}));
+		const filteredReads = await this.filterLatestReads(
+			deletedMessage.chatId,
+			deletedMessage.id,
+			readsData,
+		);
+
+		// Get forwarded message info if exists
+		let forwardedFrom = null;
+		if (deletedMessage.forwardedFromMessageId) {
+			const originalMessage = await prisma.message.findUnique({
+				where: { id: deletedMessage.forwardedFromMessageId },
+				select: {
+					sender: {
+						select: {
+							username: true,
+						},
+					},
+					createdAt: true,
+				},
+			});
+
+			if (originalMessage) {
+				forwardedFrom = {
+					messageId: deletedMessage.forwardedFromMessageId,
+					chatId: deletedMessage.forwardedFromChatId || '',
+					chatName: deletedMessage.forwardedFromChatName,
+					senderUsername: originalMessage.sender.username,
+					originalCreatedAt: originalMessage.createdAt,
+				};
+			}
+		}
+
+		const pinnedMessage = await prisma.pinnedMessage.findFirst({
+			where: {
+				chatId: deletedMessage.chatId,
+				messageId: deletedMessage.id,
+				deletedAt: null,
+			},
+		});
+
+		return {
+			id: deletedMessage.id,
+			chatId: deletedMessage.chatId,
+			senderId: deletedMessage.senderId,
+			senderUsername: deletedMessage.sender.username,
+			content: '',
+			wasUpdated: deletedMessage.wasUpdated,
+			editedAt: deletedMessage.editedAt,
+			createdAt: deletedMessage.createdAt,
+			updatedAt: deletedMessage.updatedAt,
+			replyTo: deletedMessage.replyTo
+				? {
+						id: deletedMessage.replyTo.id,
+						content: deletedMessage.replyTo.deletedAt ? '' : deletedMessage.replyTo.content,
+						senderUsername: deletedMessage.replyTo.sender.username,
+				  }
+				: null,
+			forwardedFrom,
+			reactions: Array.from(reactionsMap.values()),
+			reads: filteredReads.length > 0 ? filteredReads : undefined,
+			isPinned: !!pinnedMessage,
+			isDeleted: true,
+		};
 	}
 
 	/**
@@ -883,7 +1027,6 @@ export class MessageService {
 		const replies = await prisma.message.findMany({
 			where: {
 				replyToId: messageId,
-				deletedAt: null,
 			},
 			include: {
 				sender: {
@@ -895,6 +1038,7 @@ export class MessageService {
 					select: {
 						id: true,
 						content: true,
+						deletedAt: true,
 						sender: {
 							select: {
 								username: true,
@@ -995,12 +1139,14 @@ export class MessageService {
 					}
 				}
 
+				const isDeleted = reply.deletedAt !== null;
+
 				return {
 					id: reply.id,
 					chatId: reply.chatId,
 					senderId: reply.senderId,
 					senderUsername: reply.sender.username,
-					content: reply.content,
+					content: isDeleted ? '' : reply.content,
 					wasUpdated: reply.wasUpdated,
 					editedAt: reply.editedAt,
 					createdAt: reply.createdAt,
@@ -1008,7 +1154,7 @@ export class MessageService {
 					replyTo: reply.replyTo
 						? {
 								id: reply.replyTo.id,
-								content: reply.replyTo.content,
+								content: reply.replyTo.deletedAt ? '' : reply.replyTo.content,
 								senderUsername: reply.replyTo.sender.username,
 						  }
 						: null,
@@ -1016,6 +1162,7 @@ export class MessageService {
 					reactions: Array.from(reactionsMap.values()),
 					reads: filteredReads.length > 0 ? filteredReads : undefined,
 					isPinned: pinnedMessageIds.has(reply.id),
+					isDeleted,
 				};
 			}),
 		);

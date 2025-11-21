@@ -31,6 +31,7 @@ export interface MessageResponse {
 		readAt: Date;
 	}[];
 	isPinned?: boolean;
+	isDeleted?: boolean;
 }
 
 export interface MessagesListResponse {
