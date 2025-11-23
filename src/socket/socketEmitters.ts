@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { MessageResponse } from '../types/message';
+import { FriendInviteResponse, FriendshipResponse, User } from '../types/friends';
 import {
 	ClientToServerEvents,
 	ServerToClientEvents,
@@ -162,4 +163,42 @@ export function emitMessagePinned(chatId: string, pinnedMessage: any) {
 export function emitMessageUnpinned(chatId: string, messageId: string) {
 	const io = getIo();
 	io.to(`chat:${chatId}`).emit('message:unpinned', { chatId, messageId });
+}
+
+/**
+ * Emit friend invitation received to receiver's personal room
+ */
+export function emitFriendInviteReceived(receiverId: string, invite: FriendInviteResponse) {
+	const io = getIo();
+	io.to(`user:${receiverId}`).emit('friend:invite:received', { invite });
+}
+
+/**
+ * Emit friend invitation accepted to both users' personal rooms
+ */
+export function emitFriendInviteAccepted(
+	requesterId: string,
+	addresseeId: string,
+	friendship: FriendshipResponse,
+) {
+	const io = getIo();
+	io.to(`user:${requesterId}`).emit('friend:invite:accepted', { friendship });
+	io.to(`user:${addresseeId}`).emit('friend:invite:accepted', { friendship });
+}
+
+/**
+ * Emit friend invitation rejected to sender's personal room
+ */
+export function emitFriendInviteRejected(senderId: string, invite: FriendInviteResponse) {
+	const io = getIo();
+	io.to(`user:${senderId}`).emit('friend:invite:rejected', { invite });
+}
+
+/**
+ * Emit friend removed to both users' personal rooms
+ */
+export function emitFriendRemoved(userId1: string, userId2: string, removedFriend: User) {
+	const io = getIo();
+	io.to(`user:${userId1}`).emit('friend:removed', { friendId: userId2, friend: removedFriend });
+	io.to(`user:${userId2}`).emit('friend:removed', { friendId: userId1, friend: removedFriend });
 }

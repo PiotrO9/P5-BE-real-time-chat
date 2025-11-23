@@ -8,6 +8,12 @@ import {
 	InvitesResponse,
 	FriendshipResponse,
 } from '../types/friends';
+import {
+	emitFriendInviteReceived,
+	emitFriendInviteAccepted,
+	emitFriendInviteRejected,
+	emitFriendRemoved,
+} from '../socket/socketEmitters';
 
 const prisma = new PrismaClient();
 
@@ -141,12 +147,18 @@ export class FriendsService {
 			},
 		});
 
-		return {
+		const inviteResponse: FriendInviteResponse = {
 			id: invite.id,
 			status: invite.status,
 			createdAt: invite.createdAt,
 			receiver: invite.receiver,
+			sender: invite.sender,
 		};
+
+		// Emit WebSocket event to receiver
+		emitFriendInviteReceived(receiver.id, inviteResponse);
+
+		return inviteResponse;
 	}
 
 	/**
@@ -257,10 +269,15 @@ export class FriendsService {
 			});
 		});
 
-		return {
+		const friendship: FriendshipResponse = {
 			requester: invite.sender,
 			addressee: invite.receiver,
 		};
+
+		// Emit WebSocket event to both users
+		emitFriendInviteAccepted(invite.sender.id, invite.receiver.id, friendship);
+
+		return friendship;
 	}
 
 	/**
@@ -290,12 +307,18 @@ export class FriendsService {
 			},
 		});
 
-		return {
+		const inviteResponse: FriendInviteResponse = {
 			id: invite.id,
 			status: 'REJECTED',
 			createdAt: invite.createdAt,
 			sender: invite.sender,
+			receiver: invite.receiver,
 		};
+
+		// Emit WebSocket event to sender
+		emitFriendInviteRejected(invite.sender.id, inviteResponse);
+
+		return inviteResponse;
 	}
 
 	/**
@@ -353,7 +376,13 @@ export class FriendsService {
 		});
 
 		// Determine which user was removed as friend
-		return friendship.requesterId === currentUserId ? friendship.addressee : friendship.requester;
+		const removedFriend =
+			friendship.requesterId === currentUserId ? friendship.addressee : friendship.requester;
+
+		// Emit WebSocket event to both users
+		emitFriendRemoved(currentUserId, friendId, removedFriend);
+
+		return removedFriend;
 	}
 
 	// Private helper methods

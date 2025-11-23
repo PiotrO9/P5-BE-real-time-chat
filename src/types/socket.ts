@@ -1,4 +1,5 @@
 import { MessageResponse } from '../services/messageService';
+import { FriendInviteResponse, FriendshipResponse, User } from './friends';
 
 // Socket Authentication Data
 export interface SocketAuthData {
@@ -59,6 +60,10 @@ export interface ServerToClientEvents {
 		};
 	}) => void;
 	'message:unpinned': (data: { chatId: string; messageId: string }) => void;
+	'friend:invite:received': (data: { invite: FriendInviteResponse }) => void;
+	'friend:invite:accepted': (data: { friendship: FriendshipResponse }) => void;
+	'friend:invite:rejected': (data: { invite: FriendInviteResponse }) => void;
+	'friend:removed': (data: { friendId: string; friend: User }) => void;
 }
 
 // Inter-server Events
