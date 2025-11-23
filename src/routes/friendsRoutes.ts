@@ -7,6 +7,7 @@ import {
 	acceptInvite,
 	rejectInvite,
 	deleteFriend,
+	searchFriends,
 } from '../controllers/friendsController';
 
 const router = Router();
@@ -354,5 +355,73 @@ router.patch('/invites/:id/reject', authenticateToken, rejectInvite);
  *         description: Internal server error
  */
 router.delete('/:friendId', authenticateToken, deleteFriend);
+
+/**
+ * @openapi
+ * /api/friends/search:
+ *   get:
+ *     summary: Search friends by username or email
+ *     description: Search for friends by username or email (case-insensitive)
+ *     tags:
+ *       - friends
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *         description: Search query (searches in username and email)
+ *     responses:
+ *       200:
+ *         description: Friends found successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     friends:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           username:
+ *                             type: string
+ *                           email:
+ *                             type: string
+ *                           isOnline:
+ *                             type: boolean
+ *                           lastSeen:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           friendshipCreatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                     count:
+ *                       type: number
+ *       400:
+ *         description: Bad request - validation error
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/search', authenticateToken, searchFriends);
 
 export { router as friendsRoutes };

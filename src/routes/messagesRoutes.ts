@@ -12,6 +12,7 @@ import {
 	markMessageAsRead,
 	getMessageReaders,
 	forwardMessage,
+	searchMessages,
 } from '../controllers/messagesController';
 
 const router = Router();
@@ -732,5 +733,101 @@ router.get('/:messageId/readers', authenticateToken, getMessageReaders);
  *         description: Internal server error
  */
 router.post('/:chatId/forward', authenticateToken, sendMessageRateLimiter, forwardMessage);
+
+/**
+ * @openapi
+ * /api/messages/{chatId}/search:
+ *   get:
+ *     summary: Search messages in a chat
+ *     description: Search for messages in a specific chat by content
+ *     tags:
+ *       - messages
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Chat ID
+ *       - in: query
+ *         name: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *         description: Search query
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Maximum number of messages to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
+ *         description: Number of messages to skip
+ *     responses:
+ *       200:
+ *         description: Messages found successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     messages:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           chatId:
+ *                             type: string
+ *                             format: uuid
+ *                           senderId:
+ *                             type: string
+ *                             format: uuid
+ *                           senderUsername:
+ *                             type: string
+ *                           content:
+ *                             type: string
+ *                           wasUpdated:
+ *                             type: boolean
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                     total:
+ *                       type: number
+ *                     hasMore:
+ *                       type: boolean
+ *       400:
+ *         description: Bad request - validation error
+ *       404:
+ *         description: Chat not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/:chatId/search', authenticateToken, searchMessages);
 
 export { router as messagesRoutes };

@@ -208,3 +208,36 @@ export async function deleteFriend(req: Request, res: Response, next: NextFuncti
 		next(error);
 	}
 }
+
+/**
+ * Search friends by username or email
+ * GET /api/friends/search
+ */
+export async function searchFriends(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.user?.userId;
+
+		if (!userId) {
+			ResponseHelper.unauthorized(res);
+			return;
+		}
+
+		const { query } = req.query;
+
+		if (!query || typeof query !== 'string' || query.trim().length === 0) {
+			ResponseHelper.validationError(res, [
+				{ field: 'query', message: 'Search query is required' },
+			]);
+			return;
+		}
+
+		const friends = await friendsService.searchFriends(userId, query.trim());
+
+		ResponseHelper.success(res, 'Friends found successfully', {
+			friends,
+			count: friends.length,
+		});
+	} catch (error) {
+		next(error);
+	}
+}

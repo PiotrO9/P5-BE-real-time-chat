@@ -1402,4 +1402,200 @@ export class MessageService {
 			readAt: read.readAt,
 		}));
 	}
+
+	/**
+	 * Search messages in a chat by content
+	 */
+	async searchMessages(
+		userId: string,
+		chatId: string,
+		query: string,
+		limit: number = 20,
+		offset: number = 0,
+	): Promise<{ messages: MessageResponse[]; total: number; hasMore: boolean }> {
+		// Verify user is a member of the chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		// Search messages containing the query (case-insensitive)
+		const whereClause = {
+			chatId,
+			deletedAt: null,
+			content: {
+				contains: query,
+				mode: 'insensitive' as const,
+			},
+		};
+
+		// Get total count
+		const total = await prisma.message.count({
+			where: whereClause,
+		});
+
+		// Get messages with pagination
+		const messages = await prisma.message.findMany({
+			where: whereClause,
+			include: {
+				sender: {
+					select: {
+						username: true,
+					},
+				},
+				replyTo: {
+					select: {
+						id: true,
+						content: true,
+						deletedAt: true,
+						sender: {
+							select: {
+								username: true,
+							},
+						},
+					},
+				},
+				reactions: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								id: true,
+							},
+						},
+					},
+				},
+				reads: {
+					where: {
+						deletedAt: null,
+					},
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+							},
+						},
+					},
+				},
+			},
+			orderBy: {
+				createdAt: 'desc', // Most recent first
+			},
+			skip: offset,
+			take: limit + 1,
+		});
+
+		const hasMore = messages.length > limit;
+		const messagesToReturn = hasMore ? messages.slice(0, limit) : messages;
+
+		// Get chat users for filtering reads
+		const chatUsers = await prisma.chatUser.findMany({
+			where: {
+				chatId,
+				deletedAt: null,
+			},
+			select: {
+				userId: true,
+				lastReadMessageId: true,
+			},
+		});
+
+		// Transform messages to response format
+		const transformedMessages: MessageResponse[] = await Promise.all(
+			messagesToReturn.map(async message => {
+				// Group reactions
+				const reactionMap = new Map<string, { count: number; userIds: string[] }>();
+				message.reactions.forEach(reaction => {
+					if (!reactionMap.has(reaction.emoji)) {
+						reactionMap.set(reaction.emoji, { count: 0, userIds: [] });
+					}
+					const reactionData = reactionMap.get(reaction.emoji)!;
+					reactionData.count++;
+					reactionData.userIds.push(reaction.user.id);
+				});
+
+				const reactions = Array.from(reactionMap.entries()).map(([emoji, data]) => ({
+					emoji,
+					...data,
+				}));
+
+				// Filter reads to only show latest reads
+				const filteredReads = await this.filterLatestReads(
+					chatId,
+					message.id,
+					message.reads.map(read => ({
+						userId: read.user.id,
+						username: read.user.username,
+						readAt: read.readAt,
+					})),
+					chatUsers,
+				);
+
+				// Get forwarded message details if exists
+				let forwardedFrom = null;
+				if (message.forwardedFromMessageId) {
+					const originalMessage = await prisma.message.findUnique({
+						where: { id: message.forwardedFromMessageId },
+						select: {
+							sender: {
+								select: {
+									username: true,
+								},
+							},
+							createdAt: true,
+						},
+					});
+
+					if (originalMessage) {
+						forwardedFrom = {
+							messageId: message.forwardedFromMessageId,
+							chatId: message.forwardedFromChatId || '',
+							chatName: message.forwardedFromChatName,
+							senderUsername: originalMessage.sender.username,
+							originalCreatedAt: originalMessage.createdAt,
+						};
+					}
+				}
+
+				return {
+					id: message.id,
+					chatId: message.chatId,
+					senderId: message.senderId,
+					senderUsername: message.sender.username,
+					content: message.content,
+					wasUpdated: message.wasUpdated,
+					editedAt: message.editedAt ?? null,
+					createdAt: message.createdAt,
+					updatedAt: message.updatedAt,
+					replyTo: message.replyTo
+						? {
+								id: message.replyTo.id,
+								content: message.replyTo.deletedAt ? '[Deleted]' : message.replyTo.content,
+								senderUsername: message.replyTo.sender.username,
+						  }
+						: undefined,
+					reactions: reactions.length > 0 ? reactions : undefined,
+					reads: filteredReads.length > 0 ? filteredReads : undefined,
+					forwardedFrom,
+					isDeleted: !!message.deletedAt,
+				};
+			}),
+		);
+
+		return {
+			messages: transformedMessages,
+			total,
+			hasMore,
+		};
+	}
 }

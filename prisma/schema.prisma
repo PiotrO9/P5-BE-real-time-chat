@@ -124,6 +124,7 @@ model Message {
 
   @@index([chatId, createdAt])
   @@index([chatId, senderId])
+  @@index([chatId, content])
 }
 
 model MessageRead {

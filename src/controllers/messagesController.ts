@@ -517,3 +517,63 @@ export async function forwardMessage(req: Request, res: Response, next: NextFunc
 		next(error);
 	}
 }
+
+/**
+ * Search messages in a chat
+ * GET /api/messages/:chatId/search
+ */
+export async function searchMessages(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.user?.userId;
+
+		if (!userId) {
+			ResponseHelper.unauthorized(res);
+			return;
+		}
+
+		const { chatId } = req.params;
+		const { query, limit, offset } = req.query;
+
+		if (!query || typeof query !== 'string' || query.trim().length === 0) {
+			ResponseHelper.validationError(res, [
+				{ field: 'query', message: 'Search query is required' },
+			]);
+			return;
+		}
+
+		const limitNum = limit ? parseInt(limit as string, 10) : 20;
+		const offsetNum = offset ? parseInt(offset as string, 10) : 0;
+
+		if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+			ResponseHelper.validationError(res, [
+				{ field: 'limit', message: 'Limit must be between 1 and 100' },
+			]);
+			return;
+		}
+
+		if (isNaN(offsetNum) || offsetNum < 0) {
+			ResponseHelper.validationError(res, [
+				{ field: 'offset', message: 'Offset must be a non-negative number' },
+			]);
+			return;
+		}
+
+		const result = await messageService.searchMessages(
+			userId,
+			chatId,
+			query.trim(),
+			limitNum,
+			offsetNum,
+		);
+
+		ResponseHelper.success(res, 'Messages found successfully', result);
+	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message === 'Chat not found or you are not a member of this chat') {
+				ResponseHelper.notFound(res, error.message);
+				return;
+			}
+		}
+		next(error);
+	}
+}

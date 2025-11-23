@@ -445,4 +445,66 @@ export class FriendsService {
 			},
 		});
 	}
+
+	/**
+	 * Search friends by username or email
+	 */
+	async searchFriends(userId: string, query: string): Promise<Friend[]> {
+		// Get all user's friends first
+		const friendships = await prisma.friendship.findMany({
+			where: {
+				OR: [{ requesterId: userId }, { addresseeId: userId }],
+				deletedAt: null,
+			},
+			include: {
+				requester: {
+					select: {
+						id: true,
+						username: true,
+						email: true,
+						isOnline: true,
+						lastSeen: true,
+						createdAt: true,
+					},
+				},
+				addressee: {
+					select: {
+						id: true,
+						username: true,
+						email: true,
+						isOnline: true,
+						lastSeen: true,
+						createdAt: true,
+					},
+				},
+			},
+			orderBy: {
+				createdAt: 'desc',
+			},
+		});
+
+		// Filter friends by query (case-insensitive search in username or email)
+		const queryLower = query.toLowerCase();
+		const filteredFriendships = friendships.filter(friendship => {
+			const friend = friendship.requesterId === userId ? friendship.addressee : friendship.requester;
+			return (
+				friend.username.toLowerCase().includes(queryLower) ||
+				friend.email.toLowerCase().includes(queryLower)
+			);
+		});
+
+		return filteredFriendships.map(friendship => {
+			if (friendship.requesterId === userId) {
+				return {
+					...friendship.addressee,
+					friendshipCreatedAt: friendship.createdAt,
+				};
+			} else {
+				return {
+					...friendship.requester,
+					friendshipCreatedAt: friendship.createdAt,
+				};
+			}
+		});
+	}
 }
