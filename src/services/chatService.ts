@@ -98,6 +98,7 @@ export class ChatService {
 					updatedAt: chat.updatedAt,
 					lastMessage,
 					unreadCount,
+					hasOnlineMembers: false,
 				};
 
 				// If it's a 1-on-1 chat, add other user info
@@ -112,6 +113,9 @@ export class ChatService {
 							lastSeen: otherChatUser.user.lastSeen,
 							createdAt: otherChatUser.user.createdAt,
 						};
+						chatResponse.hasOnlineMembers = otherChatUser.user.isOnline;
+					} else {
+						chatResponse.hasOnlineMembers = false;
 					}
 				} else {
 					// If it's a group chat, add members info
@@ -127,6 +131,9 @@ export class ChatService {
 
 					chatResponse.members = members;
 					chatResponse.memberCount = members.length;
+
+					// Calculate online status for group chat
+					chatResponse.hasOnlineMembers = members.some(m => m.isOnline);
 				}
 
 				return chatResponse;
@@ -293,6 +300,7 @@ export class ChatService {
 			updatedAt: chat.updatedAt,
 			lastMessage: null,
 			unreadCount: 0,
+			hasOnlineMembers: otherUser ? otherUser.user.isOnline : false,
 			otherUser: otherUser
 				? {
 						id: otherUser.user.id,
@@ -418,6 +426,9 @@ export class ChatService {
 			joinedAt: cu.joinedAt,
 		}));
 
+		// Calculate online status for group chat
+		const hasOnlineMembers = members.some(m => m.isOnline);
+
 		const chatResponse: ChatResponse = {
 			id: chat.id,
 			name: chat.name,
@@ -426,6 +437,7 @@ export class ChatService {
 			updatedAt: chat.updatedAt,
 			lastMessage: null,
 			unreadCount: 0,
+			hasOnlineMembers,
 			members: members,
 			memberCount: members.length,
 		};
@@ -515,6 +527,7 @@ export class ChatService {
 			updatedAt: chat.updatedAt,
 			lastMessage,
 			unreadCount,
+			hasOnlineMembers: false,
 		};
 
 		// If it's a 1-on-1 chat, add other user info
@@ -529,6 +542,9 @@ export class ChatService {
 					lastSeen: otherChatUser.user.lastSeen,
 					createdAt: otherChatUser.user.createdAt,
 				};
+				chatResponse.hasOnlineMembers = otherChatUser.user.isOnline;
+			} else {
+				chatResponse.hasOnlineMembers = false;
 			}
 		} else {
 			// If it's a group chat, add members info
@@ -544,6 +560,9 @@ export class ChatService {
 
 			chatResponse.members = members;
 			chatResponse.memberCount = members.length;
+
+			// Calculate online status for group chat
+			chatResponse.hasOnlineMembers = members.some(m => m.isOnline);
 		}
 
 		return chatResponse;

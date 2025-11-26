@@ -34,6 +34,7 @@ export interface ChatResponse {
 	updatedAt: Date;
 	lastMessage: LastMessage | null;
 	unreadCount: number;
+	hasOnlineMembers: boolean;
 	// For 1-on-1 chats
 	otherUser?: User;
 	// For group chats
