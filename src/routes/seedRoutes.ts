@@ -53,7 +53,7 @@ const router = Router();
  *                       example: "password123"
  *                     note:
  *                       type: string
- *                       example: "Wszyscy użytkownicy mają hasło: password123"
+ *                       example: "All users have password: password123"
  *       500:
  *         description: Internal server error
  */

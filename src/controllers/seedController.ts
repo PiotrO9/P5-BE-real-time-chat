@@ -17,7 +17,7 @@ export async function seedDatabase(req: Request, res: Response, next: NextFuncti
 				...result.statistics,
 				usersList: result.users,
 				defaultPassword: result.defaultPassword,
-				note: `Wszyscy użytkownicy mają hasło: ${result.defaultPassword}`,
+				note: `All users have password: ${result.defaultPassword}`,
 			},
 		});
 	} catch (error) {

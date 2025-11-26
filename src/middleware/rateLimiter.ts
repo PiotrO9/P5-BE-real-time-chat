@@ -4,18 +4,18 @@ import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 
 /**
- * Rate limiter dla wysyłania wiadomości
- * 30 wiadomości na minutę z jednego IP
+ * Rate limiter for sending messages
+ * 30 messages per minute from one IP
  */
 export const sendMessageRateLimiter = rateLimit({
-	windowMs: 60 * 1000, // 1 minuta
-	max: 30, // maksymalnie 30 wiadomości na minutę
+	windowMs: 60 * 1000, // 1 minute
+	max: 30, // maximum 30 messages per minute
 	message: {
 		success: false,
 		message: 'Too many messages. Please try again later.',
 	},
-	standardHeaders: true, // zwraca informacje o limicie w nagłówkach `RateLimit-*`
-	legacyHeaders: false, // wyłącza nagłówki `X-RateLimit-*`
+	standardHeaders: true, // returns limit information in `RateLimit-*` headers
+	legacyHeaders: false, // disables `X-RateLimit-*` headers
 	handler: (req: Request, res: Response) => {
 		const resetTime = req.rateLimit?.resetTime
 			? typeof req.rateLimit.resetTime === 'number'

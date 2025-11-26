@@ -76,7 +76,7 @@ const swaggerOptions = {
 		info: {
 			title: 'API Docs',
 			version: '1.0.0',
-			description: 'Automatycznie generowana dokumentacja API',
+			description: 'Automatically generated API documentation',
 		},
 		servers: [
 			{
@@ -90,7 +90,7 @@ const swaggerOptions = {
 					type: 'http',
 					scheme: 'bearer',
 					bearerFormat: 'JWT',
-					description: 'Wprowadź token JWT w formacie: Bearer {token}',
+					description: 'Enter JWT token in format: Bearer {token}',
 				},
 			},
 		},

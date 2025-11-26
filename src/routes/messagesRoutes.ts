@@ -236,7 +236,7 @@ router.get('/:chatId/messages', authenticateToken, getMessages);
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: Zbyt wiele wiadomości. Spróbuj ponownie za chwilę.
+ *                   example: Too many messages. Please try again later.
  *                 retryAfter:
  *                   type: number
  *                   example: 45
