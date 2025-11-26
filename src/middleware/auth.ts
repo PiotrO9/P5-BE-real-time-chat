@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import {
 	verifyAccessToken,
 	TokenPayload,
 	generateAccessToken,
+	setAccessTokenCookie,
 	SLIDING_SESSION_ENABLED,
 } from '../utils/jwt';
+import { refreshAccessToken } from '../services/authService';
+import { AuthServiceError } from '../types/auth';
 
 declare global {
 	namespace Express {
@@ -15,12 +19,73 @@ declare global {
 }
 
 /**
+ * Check if error is a JWT-related error (expired or invalid token)
+ */
+function isJwtError(error: unknown): error is jwt.TokenExpiredError | jwt.JsonWebTokenError {
+	return error instanceof jwt.TokenExpiredError || error instanceof jwt.JsonWebTokenError;
+}
+
+/**
+ * Handle refresh token flow when access token is expired or invalid
+ */
+async function handleTokenRefresh(
+	refreshToken: string,
+	res: Response,
+): Promise<TokenPayload | null> {
+	try {
+		const newAccessToken = await refreshAccessToken(refreshToken);
+		const decoded = verifyAccessToken(newAccessToken);
+
+		setAccessTokenCookie(res, newAccessToken);
+		res.setHeader('X-Token-Refreshed', 'true');
+
+		return decoded;
+	} catch (refreshError) {
+		if (refreshError instanceof AuthServiceError) {
+			res.status(refreshError.statusCode).json({
+				success: false,
+				message: refreshError.message,
+			});
+			return null;
+		}
+
+		res.status(401).json({
+			success: false,
+			message: 'Failed to refresh access token',
+		});
+		return null;
+	}
+}
+
+/**
+ * Apply sliding session - refresh access token if enabled
+ */
+function applySlidingSession(decoded: TokenPayload, res: Response): void {
+	if (!SLIDING_SESSION_ENABLED) {
+		return;
+	}
+
+	const newAccessToken = generateAccessToken({
+		userId: decoded.userId,
+		email: decoded.email,
+	});
+
+	setAccessTokenCookie(res, newAccessToken);
+	res.setHeader('X-Token-Refreshed', 'true');
+}
+
+/**
  * Middleware to authenticate user using JWT from cookies
  * Automatically refreshes access token on successful authentication (sliding session)
+ * If access token expired, automatically uses refresh token to get new access token
  */
-export const authenticateToken = (req: Request, res: Response, next: NextFunction): void => {
+export const authenticateToken = async (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> => {
 	try {
-		const { accessToken } = req.cookies;
+		const { accessToken, refreshToken } = req.cookies;
 
 		if (!accessToken) {
 			res.status(401).json({
@@ -30,27 +95,39 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 			return;
 		}
 
-		// Verify access token
-		const decoded = verifyAccessToken(accessToken);
+		let decoded: TokenPayload;
+		let tokenWasRefreshed = false;
+
+		try {
+			decoded = verifyAccessToken(accessToken);
+		} catch (error) {
+			if (!isJwtError(error)) {
+				throw error;
+			}
+
+			// Access token expired or invalid - try to refresh using refresh token
+			if (!refreshToken) {
+				res.status(401).json({
+					success: false,
+					message: 'Access token expired and no refresh token provided',
+				});
+				return;
+			}
+
+			const refreshedDecoded = await handleTokenRefresh(refreshToken, res);
+			if (!refreshedDecoded) {
+				return; // Error already handled in handleTokenRefresh
+			}
+
+			decoded = refreshedDecoded;
+			tokenWasRefreshed = true;
+		}
+
 		req.user = decoded;
 
-		// Generate new access token with refreshed expiration (sliding session)
-		if (SLIDING_SESSION_ENABLED) {
-			const newAccessToken = generateAccessToken({
-				userId: decoded.userId,
-				email: decoded.email,
-			});
-
-			// Set refreshed access token cookie
-			res.cookie('accessToken', newAccessToken, {
-				httpOnly: true,
-				secure: process.env.NODE_ENV === 'production',
-				sameSite: 'strict',
-				maxAge: 15 * 60 * 1000, // 15 minutes refreshed
-			});
-
-			// Optional: Add header to indicate token was refreshed
-			res.setHeader('X-Token-Refreshed', 'true');
+		// Apply sliding session only if token wasn't already refreshed
+		if (!tokenWasRefreshed) {
+			applySlidingSession(decoded, res);
 		}
 
 		next();

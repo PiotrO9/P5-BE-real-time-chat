@@ -37,24 +37,18 @@ export const generateRefreshToken = (payload: TokenPayload): string => {
 
 /**
  * Verify access token
+ * Throws original JWT error (TokenExpiredError, JsonWebTokenError, etc.) for proper error handling
  */
 export const verifyAccessToken = (token: string): TokenPayload => {
-	try {
-		return jwt.verify(token, ACCESS_TOKEN_SECRET) as TokenPayload;
-	} catch (error) {
-		throw new Error('Invalid access token');
-	}
+	return jwt.verify(token, ACCESS_TOKEN_SECRET) as TokenPayload;
 };
 
 /**
  * Verify refresh token
+ * Throws original JWT error (TokenExpiredError, JsonWebTokenError, etc.) for proper error handling
  */
 export const verifyRefreshToken = (token: string): TokenPayload => {
-	try {
-		return jwt.verify(token, REFRESH_TOKEN_SECRET) as TokenPayload;
-	} catch (error) {
-		throw new Error('Invalid refresh token');
-	}
+	return jwt.verify(token, REFRESH_TOKEN_SECRET) as TokenPayload;
 };
 
 /**
@@ -84,4 +78,21 @@ export const setAuthCookies = (res: Response, accessToken: string, refreshToken:
 export const clearAuthCookies = (res: Response): void => {
 	res.clearCookie('accessToken');
 	res.clearCookie('refreshToken');
+};
+
+/**
+ * Cookie options for access token
+ */
+const ACCESS_TOKEN_COOKIE_OPTIONS = {
+	httpOnly: true,
+	secure: process.env.NODE_ENV === 'production',
+	sameSite: 'strict' as const,
+	maxAge: 15 * 60 * 1000, // 15 minutes
+};
+
+/**
+ * Set access token cookie in response
+ */
+export const setAccessTokenCookie = (res: Response, accessToken: string): void => {
+	res.cookie('accessToken', accessToken, ACCESS_TOKEN_COOKIE_OPTIONS);
 };
