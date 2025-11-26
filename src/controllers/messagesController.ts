@@ -36,7 +36,6 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
 
 		const { chatId } = req.params;
 
-		// Validate query parameters
 		const queryValidation = getMessagesQuerySchema.safeParse(req.query);
 
 		if (!queryValidation.success) {
@@ -51,18 +50,14 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
 
 		const { limit, offset } = queryValidation.data;
 
-		// Get messages from the service
 		const result = await messageService.getMessages(userId, chatId, limit, offset);
 
-		// Get user data for socket events
 		const user = await prisma.user.findUnique({
 			where: { id: userId },
 			select: { username: true },
 		});
 
-		// Emit socket event if lastReadMessageId was updated
 		if (user && result.lastReadMessageId && result.messages.length > 0) {
-			// Emit for the last read message (newest message in the list)
 			const lastReadMessage = result.messages.find(m => m.id === result.lastReadMessageId);
 
 			if (lastReadMessage && lastReadMessage.senderId !== userId) {
@@ -101,7 +96,6 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
 
 		const { chatId } = req.params;
 
-		// Validate request body
 		const bodyValidation = sendMessageSchema.safeParse(req.body);
 
 		if (!bodyValidation.success) {
@@ -116,10 +110,8 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
 
 		const { content, replyToId } = bodyValidation.data;
 
-		// Send message
 		const message = await messageService.sendMessage(userId, chatId, content, replyToId);
 
-		// Emit socket event to all chat members
 		emitNewMessage(chatId, message);
 
 		ResponseHelper.success(res, 'Message sent successfully', message, 201);
@@ -153,7 +145,6 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
 
 		const { messageId } = req.params;
 
-		// Validate request body
 		const bodyValidation = editMessageSchema.safeParse(req.body);
 
 		if (!bodyValidation.success) {
@@ -168,10 +159,8 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
 
 		const { content } = bodyValidation.data;
 
-		// Edit message
 		const message = await messageService.editMessage(userId, messageId, content);
 
-		// Emit socket event to all chat members
 		emitMessageUpdated(message.chatId, message);
 
 		ResponseHelper.success(res, 'Message updated successfully', message);
@@ -205,10 +194,8 @@ export async function deleteMessage(req: Request, res: Response, next: NextFunct
 
 		const { messageId } = req.params;
 
-		// Delete message and get updated message
 		const deletedMessage = await messageService.deleteMessage(userId, messageId);
 
-		// Emit socket event to all chat members
 		emitMessageDeleted(deletedMessage.chatId, messageId);
 
 		ResponseHelper.success(res, 'Message deleted successfully', deletedMessage);
@@ -238,7 +225,6 @@ export async function getMessageReplies(req: Request, res: Response, next: NextF
 
 		const { messageId } = req.params;
 
-		// Get replies from the service
 		const replies = await messageService.getMessageReplies(userId, messageId);
 
 		ResponseHelper.success(res, 'Message replies retrieved successfully', replies);
@@ -272,7 +258,6 @@ export async function addMessageReaction(req: Request, res: Response, next: Next
 
 		const { messageId } = req.params;
 
-		// Validate request body
 		const bodyValidation = addMessageReactionSchema.safeParse(req.body);
 
 		if (!bodyValidation.success) {
@@ -287,10 +272,8 @@ export async function addMessageReaction(req: Request, res: Response, next: Next
 
 		const { emoji } = bodyValidation.data;
 
-		// Add reaction
 		await messageService.addMessageReaction(userId, messageId, emoji);
 
-		// Get message and user details for socket event
 		const message = await prisma.message.findUnique({
 			where: { id: messageId },
 			select: { chatId: true },
@@ -301,7 +284,6 @@ export async function addMessageReaction(req: Request, res: Response, next: Next
 			select: { username: true },
 		});
 
-		// Emit socket event to all chat members
 		if (message && user) {
 			emitReactionAdded(message.chatId, messageId, {
 				emoji,
@@ -345,16 +327,13 @@ export async function deleteMessageReaction(req: Request, res: Response, next: N
 
 		const { messageId, emoji } = req.params;
 
-		// Get message details before deletion
 		const message = await prisma.message.findUnique({
 			where: { id: messageId },
 			select: { chatId: true },
 		});
 
-		// Delete reaction
 		await messageService.deleteMessageReaction(userId, messageId, emoji);
 
-		// Emit socket event to all chat members
 		if (message) {
 			emitReactionRemoved(message.chatId, messageId, {
 				emoji,
@@ -389,10 +368,8 @@ export async function markMessageAsRead(req: Request, res: Response, next: NextF
 
 		const { messageId } = req.params;
 
-		// Mark message as read
 		await messageService.markMessageAsRead(userId, messageId);
 
-		// Get message and user details for socket event
 		const message = await prisma.message.findUnique({
 			where: { id: messageId },
 			select: { chatId: true },
@@ -403,7 +380,6 @@ export async function markMessageAsRead(req: Request, res: Response, next: NextF
 			select: { username: true },
 		});
 
-		// Emit socket event to all chat members
 		if (message && user) {
 			emitMessageRead(message.chatId, messageId, {
 				userId,
@@ -443,7 +419,6 @@ export async function getMessageReaders(req: Request, res: Response, next: NextF
 
 		const { messageId } = req.params;
 
-		// Get message readers
 		const readers = await messageService.getMessageReaders(userId, messageId);
 
 		ResponseHelper.success(res, 'Message readers retrieved successfully', readers);
@@ -477,7 +452,6 @@ export async function forwardMessage(req: Request, res: Response, next: NextFunc
 
 		const { chatId } = req.params;
 
-		// Validate request body
 		const bodyValidation = forwardMessageSchema.safeParse(req.body);
 
 		if (!bodyValidation.success) {
@@ -492,10 +466,8 @@ export async function forwardMessage(req: Request, res: Response, next: NextFunc
 
 		const { messageId } = bodyValidation.data;
 
-		// Forward message
 		const message = await messageService.forwardMessage(userId, chatId, messageId);
 
-		// Emit socket event to all chat members
 		emitNewMessage(chatId, message);
 
 		ResponseHelper.success(res, 'Message forwarded successfully', message, 201);

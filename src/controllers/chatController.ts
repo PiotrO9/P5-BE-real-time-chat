@@ -58,14 +58,11 @@ export async function createChat(req: Request, res: Response, next: NextFunction
 			return;
 		}
 
-		// Validate request body
 		try {
 			const validatedData = createChatSchema.parse(req.body);
 
-			// Create chat
 			const chat = await chatService.createChat(userId, validatedData);
 
-			// Get all participant IDs for socket emission
 			const chatUsers = await prisma.chatUser.findMany({
 				where: {
 					chatId: chat.id,
@@ -78,7 +75,6 @@ export async function createChat(req: Request, res: Response, next: NextFunction
 
 			const participantIds = chatUsers.map(cu => cu.userId);
 
-			// Emit socket event to all participants
 			emitChatCreated(chat, participantIds);
 
 			ResponseHelper.success(res, 'Chat created successfully', chat, 201);
@@ -179,10 +175,8 @@ export async function updateChat(req: Request, res: Response, next: NextFunction
 		try {
 			const validatedData = updateChatSchema.parse(req.body);
 
-			// Update chat
 			const updatedChat = await chatService.updateChat(userId, chatId, validatedData.name);
 
-			// Emit socket event to all chat members
 			emitChatUpdated(chatId, { name: validatedData.name });
 
 			ResponseHelper.success(res, 'Chat updated successfully', updatedChat);
@@ -222,14 +216,11 @@ export async function addChatMembers(req: Request, res: Response, next: NextFunc
 			return;
 		}
 
-		// Validate request body
 		try {
 			const validatedData = addChatMembersSchema.parse(req.body);
 
-			// Add members to chat
 			const updatedChat = await chatService.addChatMembers(userId, chatId, validatedData.userIds);
 
-			// Emit socket event for each new member
 			for (const newUserId of validatedData.userIds) {
 				const user = await prisma.user.findUnique({
 					where: { id: newUserId },
@@ -281,14 +272,11 @@ export async function removeChatMembers(req: Request, res: Response, next: NextF
 			return;
 		}
 
-		// Validate request body
 		try {
 			const validatedData = removeChatMembersSchema.parse(req.body);
 
-			// Remove members from chat
 			const updatedChat = await chatService.removeChatMembers(userId, chatId, validatedData.userIds);
 
-			// Emit socket event for each removed member
 			for (const removedUserId of validatedData.userIds) {
 				emitMemberRemoved(chatId, removedUserId);
 			}
@@ -336,11 +324,9 @@ export async function updateChatMembersRole(req: Request, res: Response, next: N
 			return;
 		}
 
-		// Validate request body
 		try {
 			const validatedData = updateChatMemberRoleSchema.parse(req.body);
 
-			// Update member role
 			const updatedChat = await chatService.updateChatMemberRole(
 				userId,
 				chatId,
@@ -427,7 +413,6 @@ export async function pinMessage(req: Request, res: Response, next: NextFunction
 
 		const pinnedMessage = await chatService.pinMessage(userId, chatId, messageId);
 
-		// Emit socket event to all chat members
 		emitMessagePinned(chatId, pinnedMessage);
 
 		ResponseHelper.success(res, 'Message pinned successfully', pinnedMessage, 201);
@@ -478,7 +463,6 @@ export async function unpinMessage(req: Request, res: Response, next: NextFuncti
 
 		const result = await chatService.unpinMessage(userId, chatId, messageId);
 
-		// Emit socket event to all chat members
 		emitMessageUnpinned(chatId, messageId);
 
 		ResponseHelper.success(res, 'Message unpinned successfully', result);

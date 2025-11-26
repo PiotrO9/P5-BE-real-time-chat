@@ -1,20 +1,17 @@
 import { MessageResponse } from '../services/messageService';
 import { FriendInviteResponse, FriendshipResponse, User } from './friends';
 
-// Socket Authentication Data
 export interface SocketAuthData {
 	userId: string;
 	email: string;
 }
 
-// Client to Server Events
 export interface ClientToServerEvents {
 	'typing:start': (data: { chatId: string }) => void;
 	'typing:stop': (data: { chatId: string }) => void;
 	'chat:join': (data: { chatId: string }) => void;
 }
 
-// Server to Client Events
 export interface ServerToClientEvents {
 	'message:new': (data: { chatId: string; message: MessageResponse }) => void;
 	'message:updated': (data: { chatId: string; message: MessageResponse }) => void;
@@ -66,12 +63,10 @@ export interface ServerToClientEvents {
 	'friend:removed': (data: { friendId: string; friend: User }) => void;
 }
 
-// Inter-server Events
 export interface InterServerEvents {
 	ping: () => void;
 }
 
-// Socket Data
 export interface SocketData {
 	userId: string;
 	email: string;

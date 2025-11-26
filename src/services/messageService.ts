@@ -13,7 +13,6 @@ export class MessageService {
 		reads: Array<{ userId: string; username: string; readAt: Date }>,
 		chatUsersCache?: Array<{ userId: string; lastReadMessageId: string | null }>,
 	): Promise<Array<{ userId: string; username: string; readAt: Date }>> {
-		// Get all chat users with their last read message IDs (use cache if provided)
 		let chatUsers: Array<{ userId: string; lastReadMessageId: string | null }>;
 		if (chatUsersCache) {
 			chatUsers = chatUsersCache;
@@ -30,7 +29,6 @@ export class MessageService {
 			});
 		}
 
-		// Create a set of userIds for whom this is their latest read message
 		const latestReadUserIds = new Set<string>();
 		chatUsers.forEach(chatUser => {
 			if (chatUser.lastReadMessageId === messageId) {
@@ -38,7 +36,6 @@ export class MessageService {
 			}
 		});
 
-		// Filter reads to only show users who have this as their latest read message
 		return reads.filter(read => latestReadUserIds.has(read.userId));
 	}
 	/**

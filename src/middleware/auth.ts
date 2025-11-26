@@ -105,7 +105,6 @@ export const authenticateToken = async (
 				throw error;
 			}
 
-			// Access token expired or invalid - try to refresh using refresh token
 			if (!refreshToken) {
 				res.status(401).json({
 					success: false,
@@ -125,7 +124,6 @@ export const authenticateToken = async (
 
 		req.user = decoded;
 
-		// Apply sliding session only if token wasn't already refreshed
 		if (!tokenWasRefreshed) {
 			applySlidingSession(decoded, res);
 		}
@@ -159,7 +157,6 @@ export const authenticateTokenWithoutRefresh = (
 			return;
 		}
 
-		// Verify access token
 		const decoded = verifyAccessToken(accessToken);
 		req.user = decoded;
 		next();

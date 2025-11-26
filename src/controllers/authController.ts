@@ -86,10 +86,8 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 		setAuthCookies(res, result.accessToken, result.refreshToken);
 
-		// Set user status to online
 		try {
 			await userService.setUserOnline(result.user.id);
-			// Emit status change to all relevant users
 			emitUserStatusChange(result.user.id, true, new Date());
 		} catch (error) {
 			console.error('Error setting user online status:', error);
@@ -178,11 +176,9 @@ export async function logout(req: Request, res: Response): Promise<void> {
 			await logoutUser(refreshToken);
 		}
 
-		// Set user status to offline
 		if (userId) {
 			try {
 				await userService.setUserOffline(userId);
-				// Emit status change to all relevant users
 				emitUserStatusChange(userId, false, new Date());
 			} catch (error) {
 				console.error('Error setting user offline status:', error);

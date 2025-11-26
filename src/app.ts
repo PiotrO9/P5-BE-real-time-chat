@@ -55,7 +55,6 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 	},
 );
 
-// Initialize Socket.io
 initializeSocketEmitters(io);
 initializeSocketHandlers(io);
 

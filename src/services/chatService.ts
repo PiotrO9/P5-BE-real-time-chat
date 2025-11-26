@@ -4,9 +4,7 @@ import { ChatResponse, ChatsListResponse, LastMessage, ChatMember } from '../typ
 const prisma = new PrismaClient();
 
 interface CreateChatDTO {
-	// For 1-on-1 chat
 	participantId?: string;
-	// For group chat
 	name?: string;
 	participantIds?: string[];
 }
@@ -16,7 +14,6 @@ export class ChatService {
 	 * Gets all chats for a user with last message and unread count
 	 */
 	async getChats(userId: string): Promise<ChatsListResponse> {
-		// Find all chats where user is a member
 		const chatUsers = await prisma.chatUser.findMany({
 			where: {
 				userId,
@@ -68,12 +65,10 @@ export class ChatService {
 			},
 		});
 
-		// Process each chat to create response
 		const chats: ChatResponse[] = await Promise.all(
 			chatUsers.map(async chatUser => {
 				const chat = chatUser.chat;
 
-				// Get last message
 				const lastMessage: LastMessage | null =
 					chat.messages.length > 0
 						? {
@@ -86,10 +81,8 @@ export class ChatService {
 						  }
 						: null;
 
-				// Count unread messages
 				const unreadCount = await this.getUnreadCount(userId, chat.id);
 
-				// Base chat response
 				const chatResponse: ChatResponse = {
 					id: chat.id,
 					name: chat.name,
@@ -101,7 +94,6 @@ export class ChatService {
 					hasOnlineMembers: false,
 				};
 
-				// If it's a 1-on-1 chat, add other user info
 				if (!chat.isGroup) {
 					const otherChatUser = chat.chatUsers.find(cu => cu.userId !== userId);
 					if (otherChatUser) {
@@ -118,7 +110,6 @@ export class ChatService {
 						chatResponse.hasOnlineMembers = false;
 					}
 				} else {
-					// If it's a group chat, add members info
 					const members: ChatMember[] = chat.chatUsers.map(cu => ({
 						id: cu.user.id,
 						username: cu.user.username,
@@ -132,7 +123,6 @@ export class ChatService {
 					chatResponse.members = members;
 					chatResponse.memberCount = members.length;
 
-					// Calculate online status for group chat
 					chatResponse.hasOnlineMembers = members.some(m => m.isOnline);
 				}
 
@@ -140,7 +130,6 @@ export class ChatService {
 			}),
 		);
 
-		// Sort chats by last message date (most recent first)
 		chats.sort((a, b) => {
 			const dateA = a.lastMessage?.createdAt
 				? new Date(a.lastMessage.createdAt).getTime()
@@ -161,14 +150,11 @@ export class ChatService {
 	 * Creates a new chat (1-on-1 or group)
 	 */
 	async createChat(userId: string, data: CreateChatDTO): Promise<ChatResponse> {
-		// Check if it's a 1-on-1 or group chat
 		const isGroupChat = !!data.participantIds && !!data.name;
 
 		if (isGroupChat) {
-			// Create group chat
 			return this.createGroupChat(userId, data.name!, data.participantIds!);
 		} else {
-			// Create 1-on-1 chat
 			return this.createOneOnOneChat(userId, data.participantId!);
 		}
 	}
@@ -177,7 +163,6 @@ export class ChatService {
 	 * Creates a 1-on-1 chat between two users
 	 */
 	private async createOneOnOneChat(userId: string, participantId: string): Promise<ChatResponse> {
-		// Validate that participant exists
 		const participant = await prisma.user.findUnique({
 			where: { id: participantId, deletedAt: null },
 		});
@@ -186,12 +171,10 @@ export class ChatService {
 			throw new Error('Participant not found');
 		}
 
-		// Check if users are the same
 		if (userId === participantId) {
 			throw new Error('Cannot create chat with yourself');
 		}
 
-		// Check if users are friends
 		const friendship = await prisma.friendship.findFirst({
 			where: {
 				OR: [
@@ -213,7 +196,6 @@ export class ChatService {
 			throw new Error('You can only create chats with friends');
 		}
 
-		// Check if chat already exists between these two users
 		const existingChat = await prisma.chat.findFirst({
 			where: {
 				isGroup: false,
@@ -236,19 +218,16 @@ export class ChatService {
 			},
 		});
 
-		// If chat exists and has exactly these 2 users, return it
 		if (existingChat && existingChat.chatUsers.length === 2) {
 			const chatUserIds = existingChat.chatUsers.map(cu => cu.userId).sort();
 			const targetUserIds = [userId, participantId].sort();
 
 			if (chatUserIds[0] === targetUserIds[0] && chatUserIds[1] === targetUserIds[1]) {
-				// Return existing chat
 				const chatResponse = await this.getChatById(userId, existingChat.id);
 				return chatResponse;
 			}
 		}
 
-		// Create new 1-on-1 chat
 		const chat = await prisma.chat.create({
 			data: {
 				isGroup: false,
@@ -289,7 +268,6 @@ export class ChatService {
 			},
 		});
 
-		// Build response
 		const otherUser = chat.chatUsers.find(cu => cu.userId !== userId);
 
 		const chatResponse: ChatResponse = {
@@ -324,14 +302,12 @@ export class ChatService {
 		name: string,
 		participantIds: string[],
 	): Promise<ChatResponse> {
-		// Remove duplicates and current user from participantIds
 		const uniqueParticipantIds = [...new Set(participantIds.filter(id => id !== userId))];
 
 		if (uniqueParticipantIds.length < 2) {
 			throw new Error('Group chat must have at least 2 other participants');
 		}
 
-		// Validate that all participants exist
 		const participants = await prisma.user.findMany({
 			where: {
 				id: { in: uniqueParticipantIds },
@@ -343,7 +319,6 @@ export class ChatService {
 			throw new Error('Some participants not found');
 		}
 
-		// Check if all participants are friends with the creator
 		const friendships = await prisma.friendship.findMany({
 			where: {
 				OR: [
@@ -371,7 +346,6 @@ export class ChatService {
 			throw new Error('You can only add friends to group chats');
 		}
 
-		// Create group chat
 		const chat = await prisma.chat.create({
 			data: {
 				name: name,
@@ -379,13 +353,11 @@ export class ChatService {
 				createdBy: userId,
 				chatUsers: {
 					create: [
-						// Creator as OWNER
 						{
 							userId: userId,
 							role: ChatRole.OWNER,
 							createdBy: userId,
 						},
-						// Participants as USER
 						...uniqueParticipantIds.map(participantId => ({
 							userId: participantId,
 							role: ChatRole.USER,
@@ -415,7 +387,6 @@ export class ChatService {
 			},
 		});
 
-		// Build response
 		const members: ChatMember[] = chat.chatUsers.map(cu => ({
 			id: cu.user.id,
 			username: cu.user.username,
@@ -426,7 +397,6 @@ export class ChatService {
 			joinedAt: cu.joinedAt,
 		}));
 
-		// Calculate online status for group chat
 		const hasOnlineMembers = members.some(m => m.isOnline);
 
 		const chatResponse: ChatResponse = {
@@ -502,7 +472,6 @@ export class ChatService {
 
 		const chat = chatUser.chat;
 
-		// Get last message
 		const lastMessage: LastMessage | null =
 			chat.messages.length > 0
 				? {
@@ -515,10 +484,8 @@ export class ChatService {
 				  }
 				: null;
 
-		// Count unread messages
 		const unreadCount = await this.getUnreadCount(userId, chat.id);
 
-		// Base chat response
 		const chatResponse: ChatResponse = {
 			id: chat.id,
 			name: chat.name,
@@ -530,7 +497,6 @@ export class ChatService {
 			hasOnlineMembers: false,
 		};
 
-		// If it's a 1-on-1 chat, add other user info
 		if (!chat.isGroup) {
 			const otherChatUser = chat.chatUsers.find(cu => cu.userId !== userId);
 			if (otherChatUser) {
@@ -547,7 +513,6 @@ export class ChatService {
 				chatResponse.hasOnlineMembers = false;
 			}
 		} else {
-			// If it's a group chat, add members info
 			const members: ChatMember[] = chat.chatUsers.map(cu => ({
 				id: cu.user.id,
 				username: cu.user.username,
@@ -561,7 +526,6 @@ export class ChatService {
 			chatResponse.members = members;
 			chatResponse.memberCount = members.length;
 
-			// Calculate online status for group chat
 			chatResponse.hasOnlineMembers = members.some(m => m.isOnline);
 		}
 

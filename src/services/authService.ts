@@ -16,7 +16,6 @@ const prisma = new PrismaClient();
 export async function registerUser(data: RegisterUserData): Promise<void> {
 	const { email, username, password } = data;
 
-	// Check only active users (not deleted)
 	const existingUser = await prisma.user.findFirst({
 		where: {
 			OR: [{ email }, { username }],

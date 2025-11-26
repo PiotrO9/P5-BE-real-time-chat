@@ -121,7 +121,6 @@ export function emitChatUpdated(chatId: string, updates: any) {
 export function emitMemberAdded(chatId: string, member: any) {
 	const io = getIo();
 	io.to(`chat:${chatId}`).emit('member:added', { chatId, member });
-	// Also emit to the new member's personal room
 	io.to(`user:${member.userId}`).emit('member:added', { chatId, member });
 }
 

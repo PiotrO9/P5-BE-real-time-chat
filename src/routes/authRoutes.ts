@@ -389,7 +389,4 @@ router.get('/me', authenticateToken, me);
  */
 router.post('/change-password', authenticateToken, changePasswordHandler);
 
-// Example: If you want to use authentication WITHOUT sliding session for specific endpoints:
-// router.get('/some-endpoint', authenticateTokenWithoutRefresh, someController);
-
 export { router as authRoutes };

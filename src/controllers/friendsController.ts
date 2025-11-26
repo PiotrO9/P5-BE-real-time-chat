@@ -42,7 +42,6 @@ export async function inviteFriend(req: Request, res: Response, next: NextFuncti
 			return;
 		}
 
-		// Validate input data
 		const validationResult = inviteFriendSchema.safeParse(req.body);
 		if (!validationResult.success) {
 			const errors = validationResult.error.issues.map((err: any) => ({

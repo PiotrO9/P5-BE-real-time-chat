@@ -73,7 +73,6 @@ export class FriendsService {
 	 * Sends a friend invitation
 	 */
 	async inviteFriend(senderId: string, username: string): Promise<FriendInviteResponse> {
-		// Check if user is not trying to invite themselves
 		const sender = await prisma.user.findUnique({
 			where: { id: senderId },
 			select: { username: true },
@@ -87,7 +86,6 @@ export class FriendsService {
 			throw new Error('You cannot invite yourself');
 		}
 
-		// Find the user to invite
 		const receiver = await prisma.user.findUnique({
 			where: { username },
 			select: {
@@ -104,19 +102,16 @@ export class FriendsService {
 			throw new Error('User with given username does not exist');
 		}
 
-		// Check if already friends
 		const existingFriendship = await this.checkExistingFriendship(senderId, receiver.id);
 		if (existingFriendship) {
 			throw new Error('You are already friends');
 		}
 
-		// Check if there is already a pending invitation
 		const existingInvite = await this.checkExistingInvite(senderId, receiver.id);
 		if (existingInvite) {
 			throw new Error('Invitation already sent or received');
 		}
 
-		// Create a new invitation
 		const invite = await prisma.friendInvite.create({
 			data: {
 				senderId,
@@ -155,7 +150,6 @@ export class FriendsService {
 			sender: invite.sender,
 		};
 
-		// Emit WebSocket event to receiver
 		emitFriendInviteReceived(receiver.id, inviteResponse);
 
 		return inviteResponse;
@@ -242,15 +236,12 @@ export class FriendsService {
 			throw new Error('Invitation cannot be accepted');
 		}
 
-		// Check if they are not already friends
 		const existingFriendship = await this.checkExistingFriendship(invite.senderId, invite.receiverId);
 		if (existingFriendship) {
 			throw new Error('You are already friends');
 		}
 
-		// Start transaction
 		await prisma.$transaction(async tx => {
-			// Update invitation status to ACCEPTED
 			await tx.friendInvite.update({
 				where: { id: inviteId },
 				data: {
@@ -259,7 +250,6 @@ export class FriendsService {
 				},
 			});
 
-			// Create friendship relationship
 			await tx.friendship.create({
 				data: {
 					requesterId: invite.senderId,
@@ -274,7 +264,6 @@ export class FriendsService {
 			addressee: invite.receiver,
 		};
 
-		// Emit WebSocket event to both users
 		emitFriendInviteAccepted(invite.sender.id, invite.receiver.id, friendship);
 
 		return friendship;
@@ -298,7 +287,6 @@ export class FriendsService {
 			throw new Error('Invitation cannot be rejected');
 		}
 
-		// Update invitation status to REJECTED
 		await prisma.friendInvite.update({
 			where: { id: inviteId },
 			data: {
@@ -315,7 +303,6 @@ export class FriendsService {
 			receiver: invite.receiver,
 		};
 
-		// Emit WebSocket event to sender
 		emitFriendInviteRejected(invite.sender.id, inviteResponse);
 
 		return inviteResponse;
@@ -329,7 +316,6 @@ export class FriendsService {
 			throw new Error('You cannot remove yourself from the friend list');
 		}
 
-		// Find friendship between users
 		const friendship = await prisma.friendship.findFirst({
 			where: {
 				OR: [
@@ -366,7 +352,6 @@ export class FriendsService {
 			throw new Error('Friendship not found');
 		}
 
-		// Perform soft delete of friendship
 		await prisma.friendship.update({
 			where: { id: friendship.id },
 			data: {
@@ -375,17 +360,14 @@ export class FriendsService {
 			},
 		});
 
-		// Determine which user was removed as friend
 		const removedFriend =
 			friendship.requesterId === currentUserId ? friendship.addressee : friendship.requester;
 
-		// Emit WebSocket event to both users
 		emitFriendRemoved(currentUserId, friendId, removedFriend);
 
 		return removedFriend;
 	}
 
-	// Private helper methods
 	private async checkExistingFriendship(userId1: string, userId2: string): Promise<boolean> {
 		const friendship = await prisma.friendship.findFirst({
 			where: {
@@ -450,7 +432,6 @@ export class FriendsService {
 	 * Search friends by username or email
 	 */
 	async searchFriends(userId: string, query: string): Promise<Friend[]> {
-		// Get all user's friends first
 		const friendships = await prisma.friendship.findMany({
 			where: {
 				OR: [{ requesterId: userId }, { addresseeId: userId }],
@@ -483,7 +464,6 @@ export class FriendsService {
 			},
 		});
 
-		// Filter friends by query (case-insensitive search in username or email)
 		const queryLower = query.toLowerCase();
 		const filteredFriendships = friendships.filter(friendship => {
 			const friend = friendship.requesterId === userId ? friendship.addressee : friendship.requester;

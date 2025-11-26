@@ -40,9 +40,7 @@ export const inviteFriendSchema = z.object({
 
 export const createChatSchema = z
 	.object({
-		// For 1-on-1 chat
 		participantId: z.string().uuid('Invalid participant ID').optional(),
-		// For group chat
 		name: z
 			.string()
 			.min(1, 'Chat name is required')
