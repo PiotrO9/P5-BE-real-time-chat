@@ -1270,4 +1270,99 @@ export class ChatService {
 			chatId,
 		};
 	}
+
+	/**
+	 * Allows a user to leave a chat
+	 * For 1-on-1 chats: removes the user from the chat (soft delete chatUser)
+	 * For group chats: removes the user from the group (soft delete chatUser)
+	 * If OWNER leaves a group chat, ownership is transferred to the oldest MODERATOR or USER
+	 */
+	async leaveChat(userId: string, chatId: string): Promise<void> {
+		// Check if user is a member of this chat
+		const chatUser = await prisma.chatUser.findFirst({
+			where: {
+				userId,
+				chatId,
+				deletedAt: null,
+			},
+			include: {
+				chat: {
+					include: {
+						chatUsers: {
+							where: {
+								deletedAt: null,
+							},
+							orderBy: {
+								joinedAt: 'asc',
+							},
+						},
+					},
+				},
+			},
+		});
+
+		if (!chatUser) {
+			throw new Error('Chat not found or you are not a member of this chat');
+		}
+
+		const chat = chatUser.chat;
+
+		// If it's a 1-on-1 chat, just soft delete the chatUser
+		if (!chat.isGroup) {
+			await prisma.chatUser.update({
+				where: {
+					id: chatUser.id,
+				},
+				data: {
+					deletedAt: new Date(),
+					updatedBy: userId,
+				},
+			});
+			return;
+		}
+
+		// For group chats
+		const remainingMembers = chat.chatUsers.filter(cu => cu.userId !== userId);
+
+		// If user is OWNER and there are other members, transfer ownership
+		if (chatUser.role === ChatRole.OWNER && remainingMembers.length > 0) {
+			// Find the oldest MODERATOR or USER to transfer ownership to
+			const newOwner = remainingMembers.find(cu => cu.role === ChatRole.MODERATOR) || remainingMembers[0];
+
+			await prisma.$transaction([
+				// Transfer ownership to the new owner
+				prisma.chatUser.update({
+					where: {
+						id: newOwner.id,
+					},
+					data: {
+						role: ChatRole.OWNER,
+						updatedBy: userId,
+					},
+				}),
+				// If new owner was MODERATOR, we don't need to change anything else
+				// Soft delete the leaving user
+				prisma.chatUser.update({
+					where: {
+						id: chatUser.id,
+					},
+					data: {
+						deletedAt: new Date(),
+						updatedBy: userId,
+					},
+				}),
+			]);
+		} else {
+			// Regular user or MODERATOR leaving, or OWNER is the last member
+			await prisma.chatUser.update({
+				where: {
+					id: chatUser.id,
+				},
+				data: {
+					deletedAt: new Date(),
+					updatedBy: userId,
+				},
+			});
+		}
+	}
 }

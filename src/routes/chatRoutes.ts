@@ -5,6 +5,7 @@ import {
 	createChat,
 	getChat,
 	deleteChat,
+	leaveChat,
 	updateChat,
 	addChatMembers,
 	removeChatMembers,
@@ -342,6 +343,49 @@ router.get('/:id', authenticateToken, getChat);
  *         description: Internal server error
  */
 router.delete('/:id', authenticateToken, deleteChat);
+
+/**
+ * @openapi
+ * /api/chats/{id}/leave:
+ *   post:
+ *     summary: Leave a chat
+ *     description: Allows a user to leave a chat. For 1-on-1 chats, removes the user from the chat. For group chats, removes the user from the group. If the user is the owner of a group chat, ownership is automatically transferred to the oldest moderator or user.
+ *     tags:
+ *       - chats
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Chat ID
+ *     responses:
+ *       200:
+ *         description: Left chat successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Left chat successfully
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Chat not found or you are not a member of this chat
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/:id/leave', authenticateToken, leaveChat);
 
 /**
  * @openapi

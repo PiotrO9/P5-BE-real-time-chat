@@ -152,6 +152,36 @@ export async function deleteChat(req: Request, res: Response, next: NextFunction
 }
 
 /**
+ * Leave a chat
+ * POST /api/chats/:id/leave
+ */
+export async function leaveChat(req: Request, res: Response, next: NextFunction) {
+	try {
+		const userId = req.user?.userId;
+
+		if (!userId) {
+			ResponseHelper.unauthorized(res);
+			return;
+		}
+
+		const chatId = req.params.id;
+
+		if (!chatId) {
+			ResponseHelper.error(res, 'Chat ID is required', 400);
+			return;
+		}
+
+		await chatService.leaveChat(userId, chatId);
+
+		emitMemberRemoved(chatId, userId);
+
+		ResponseHelper.success(res, 'Left chat successfully');
+	} catch (error) {
+		next(error);
+	}
+}
+
+/**
  * Update a chat by ID
  * PATCH /api/chats/:id
  */
