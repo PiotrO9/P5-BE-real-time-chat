@@ -21,7 +21,7 @@ export class SeedService {
 			pinnedMessages: number;
 		};
 	}> {
-		const DEFAULT_PASSWORD = 'password123';
+		const DEFAULT_PASSWORD = process.env.SEED_DEFAULT_PASSWORD as string;
 
 		await this.clearDatabase();
 
