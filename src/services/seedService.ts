@@ -323,7 +323,7 @@ export class SeedService {
 
 						chats.push(chat);
 					} catch (error) {
-						console.log(`Error creating group chat ${groupIndex}:`, error);
+						console.error(`Error creating group chat ${groupIndex}:`, error);
 					}
 				}
 				continue;
@@ -351,7 +351,7 @@ export class SeedService {
 
 					chats.push(chat);
 				} catch (error) {
-					console.log(`Error creating group chat ${groupIndex}:`, error);
+					console.error(`Error creating group chat ${groupIndex}:`, error);
 				}
 			}
 		}
@@ -755,7 +755,7 @@ export class SeedService {
 					});
 					pinnedMessages.push(pinnedMessage);
 				} catch (error) {
-					console.log(`Error creating pinned message for chat ${chat.id}`);
+					console.error(`Error creating pinned message for chat ${chat.id}:`, error);
 				}
 			}
 		}

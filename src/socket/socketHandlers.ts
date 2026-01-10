@@ -29,8 +29,6 @@ export function initializeSocketHandlers(io: IoServer) {
 		const userId = socket.data.userId;
 		const email = socket.data.email;
 
-		console.log(`✅ User connected: ${email} (${userId})`);
-
 		// Store username for handlers - will be set if user exists
 		let username: string | null = null;
 
@@ -73,8 +71,6 @@ export function initializeSocketHandlers(io: IoServer) {
 			userChats.forEach(chatUser => {
 				socket.join(`chat:${chatUser.chatId}`);
 			});
-
-			console.log(`📨 User ${email} joined ${userChats.length} chat room(s) and personal room`);
 
 			// Handle typing start
 			socket.on('typing:start', async data => {
@@ -127,14 +123,11 @@ export function initializeSocketHandlers(io: IoServer) {
 
 				if (isMember) {
 					socket.join(`chat:${chatId}`);
-					console.log(`📨 User ${email} manually joined chat room: ${chatId}`);
 				}
 			});
 
 			// Handle disconnect
 			socket.on('disconnect', async () => {
-				console.log(`❌ User disconnected: ${email} (${userId})`);
-
 				try {
 					// Set user status to offline
 					await userService.setUserOffline(userId);
@@ -161,5 +154,7 @@ export function initializeSocketHandlers(io: IoServer) {
 		}
 	});
 
-	console.log('🔌 Socket.io handlers initialized');
+	if (process.env.NODE_ENV === 'development') {
+		console.log('🔌 Socket.io handlers initialized');
+	}
 }
