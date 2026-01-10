@@ -88,7 +88,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 		try {
 			await userService.setUserOnline(result.user.id);
-			emitUserStatusChange(result.user.id, true, new Date());
+			await emitUserStatusChange(result.user.id, true, new Date());
 		} catch (error) {
 			console.error('Error setting user online status:', error);
 		}
@@ -179,7 +179,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
 		if (userId) {
 			try {
 				await userService.setUserOffline(userId);
-				emitUserStatusChange(userId, false, new Date());
+				await emitUserStatusChange(userId, false, new Date());
 			} catch (error) {
 				console.error('Error setting user offline status:', error);
 			}

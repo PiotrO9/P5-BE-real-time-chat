@@ -31,6 +31,9 @@ export function initializeSocketHandlers(io: IoServer) {
 
 		console.log(`✅ User connected: ${email} (${userId})`);
 
+		// Store username for handlers - will be set if user exists
+		let username: string | null = null;
+
 		try {
 			// Set user status to online
 			await userService.setUserOnline(userId);
@@ -47,8 +50,9 @@ export function initializeSocketHandlers(io: IoServer) {
 			});
 
 			if (user) {
+				username = user.username;
 				// Broadcast online status to friends/contacts
-				emitUserStatusChange(userId, true, user.lastSeen || undefined);
+				await emitUserStatusChange(userId, true, user.lastSeen || undefined);
 			}
 
 			// Join user's personal room
@@ -85,8 +89,8 @@ export function initializeSocketHandlers(io: IoServer) {
 					},
 				});
 
-				if (isMember && user) {
-					emitTypingStart(chatId, userId, user.username);
+				if (isMember && username) {
+					emitTypingStart(chatId, userId, username);
 				}
 			});
 
@@ -145,7 +149,7 @@ export function initializeSocketHandlers(io: IoServer) {
 
 					// Broadcast offline status
 					if (updatedUser) {
-						emitUserStatusChange(userId, false, updatedUser.lastSeen || undefined);
+						await emitUserStatusChange(userId, false, updatedUser.lastSeen || undefined);
 					}
 				} catch (error) {
 					console.error(`Error handling disconnect for user ${userId}:`, error);

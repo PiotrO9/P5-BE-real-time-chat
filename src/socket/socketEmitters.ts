@@ -1,4 +1,5 @@
 import { Server } from 'socket.io';
+import { PrismaClient } from '@prisma/client';
 import { MessageResponse } from '../types/message';
 import { FriendInviteResponse, FriendshipResponse, User } from '../types/friends';
 import {
@@ -7,6 +8,8 @@ import {
 	InterServerEvents,
 	SocketData,
 } from '../types/socket';
+
+const prisma = new PrismaClient();
 
 type IoServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
@@ -90,11 +93,57 @@ export function emitMessageRead(
 }
 
 /**
- * Emit user status change to all relevant users
+ * Emit user status change to all relevant users (users who have chats with this user)
  */
-export function emitUserStatusChange(userId: string, isOnline: boolean, lastSeen?: Date) {
+export async function emitUserStatusChange(userId: string, isOnline: boolean, lastSeen?: Date) {
 	const io = getIo();
-	io.to(`user:${userId}`).emit('user:status', { userId, isOnline, lastSeen });
+
+	try {
+		// Find all chats where user is a participant
+		const userChats = await prisma.chatUser.findMany({
+			where: {
+				userId,
+				deletedAt: null,
+			},
+			select: {
+				chatId: true,
+			},
+		});
+
+		const chatIds = userChats.map(chat => chat.chatId);
+
+		// Find all other users who are in the same chats
+		let uniqueUserIds: string[] = [];
+
+		if (chatIds.length > 0) {
+			const otherChatUsers = await prisma.chatUser.findMany({
+				where: {
+					chatId: { in: chatIds },
+					userId: { not: userId },
+					deletedAt: null,
+				},
+				select: {
+					userId: true,
+				},
+				distinct: ['userId'],
+			});
+
+			// Get unique user IDs
+			uniqueUserIds = [...new Set(otherChatUsers.map(cu => cu.userId))];
+		}
+
+		// Emit to all users who have chats with this user
+		uniqueUserIds.forEach(otherUserId => {
+			io.to(`user:${otherUserId}`).emit('user:status', { userId, isOnline, lastSeen });
+		});
+
+		// Also emit to the user's own room
+		io.to(`user:${userId}`).emit('user:status', { userId, isOnline, lastSeen });
+	} catch (error) {
+		console.error('Error emitting user status change:', error);
+		// Fallback: emit only to user's own room
+		io.to(`user:${userId}`).emit('user:status', { userId, isOnline, lastSeen });
+	}
 }
 
 /**
