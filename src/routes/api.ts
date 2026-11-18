@@ -28,6 +28,8 @@ router.use('/users', userRoutes);
 router.use('/friends', friendsRoutes);
 router.use('/chats', chatRoutes);
 router.use('/messages', messagesRoutes);
-router.use('/seed', seedRoutes);
+if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
+	router.use('/seed', seedRoutes);
+}
 
 export { router };

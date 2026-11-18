@@ -6,8 +6,26 @@ export interface TokenPayload {
 	email: string;
 }
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'your-access-secret-key';
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key';
+const localAccessSecret = 'your-access-secret-key';
+const localRefreshSecret = 'your-refresh-secret-key';
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET?.trim() || localAccessSecret;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET?.trim() || localRefreshSecret;
+
+if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+	const unsafeSecrets = new Set([
+		localAccessSecret,
+		localRefreshSecret,
+		'your-super-secret-access-token-key-here',
+		'your-super-secret-refresh-token-key-here',
+	]);
+	if (
+		unsafeSecrets.has(ACCESS_TOKEN_SECRET) ||
+		unsafeSecrets.has(REFRESH_TOKEN_SECRET) ||
+		ACCESS_TOKEN_SECRET === REFRESH_TOKEN_SECRET
+	) {
+		throw new Error('Set distinct ACCESS_TOKEN_SECRET and REFRESH_TOKEN_SECRET values');
+	}
+}
 
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';

@@ -1,4 +1,4 @@
-import { MessageResponse } from '../services/messageService';
+import type { MessageResponse } from './message';
 import { FriendInviteResponse, FriendshipResponse, User } from './friends';
 
 export interface SocketAuthData {
@@ -13,6 +13,7 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+	'session:ready': () => void;
 	'message:new': (data: { chatId: string; message: MessageResponse }) => void;
 	'message:updated': (data: { chatId: string; message: MessageResponse }) => void;
 	'message:deleted': (data: { chatId: string; messageId: string }) => void;

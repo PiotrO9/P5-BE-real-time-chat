@@ -17,11 +17,9 @@ import {
 	emitMessagePinned,
 	emitMessageUnpinned,
 } from '../socket/socketEmitters';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 
 const chatService = new ChatService();
-const prisma = new PrismaClient();
-
 /**
  * Get all chats for current user
  * GET /api/chats

@@ -24,7 +24,7 @@ export function socketAuthMiddleware(socket: AuthSocket, next: (err?: Error) => 
 				?.split('=')[1];
 
 		if (!token) {
-			return next(new Error('Authentication required'));
+			return next(authError('Authentication required'));
 		}
 
 		// Verify token
@@ -36,6 +36,10 @@ export function socketAuthMiddleware(socket: AuthSocket, next: (err?: Error) => 
 
 		next();
 	} catch (error) {
-		next(new Error('Invalid or expired token'));
+		next(authError('Invalid or expired token'));
 	}
+}
+
+function authError(message: string) {
+	return Object.assign(new Error(message), { data: { code: 'AUTH_REQUIRED' } });
 }

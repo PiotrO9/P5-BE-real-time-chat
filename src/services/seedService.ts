@@ -1,7 +1,6 @@
 import bcrypt from 'bcrypt';
-import { PrismaClient, ChatRole, InviteStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { ChatRole, InviteStatus } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 
 export class SeedService {
 	/**

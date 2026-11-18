@@ -1,7 +1,6 @@
-import { PrismaClient, ChatRole } from '@prisma/client';
+import { ChatRole } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { ChatResponse, ChatsListResponse, LastMessage, ChatMember } from '../types/chat';
-
-const prisma = new PrismaClient();
 
 interface CreateChatDTO {
 	participantId?: string;

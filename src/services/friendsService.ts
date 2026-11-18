@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import {
 	User,
 	Friend,
@@ -14,8 +14,6 @@ import {
 	emitFriendInviteRejected,
 	emitFriendRemoved,
 } from '../socket/socketEmitters';
-
-const prisma = new PrismaClient();
 
 export class FriendsService {
 	/**

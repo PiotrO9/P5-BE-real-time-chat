@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import {
 	ClientToServerEvents,
 	ServerToClientEvents,
@@ -14,7 +14,6 @@ type IoServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEv
 
 type AuthSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
-const prisma = new PrismaClient();
 const userService = new UserService();
 
 /**
@@ -148,6 +147,7 @@ export function initializeSocketHandlers(io: IoServer) {
 					console.error(`Error handling disconnect for user ${userId}:`, error);
 				}
 			});
+			socket.emit('session:ready');
 		} catch (error) {
 			console.error(`Error handling connection for user ${userId}:`, error);
 			socket.disconnect();

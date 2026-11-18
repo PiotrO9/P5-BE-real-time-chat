@@ -63,11 +63,47 @@ npm run db:push
 npm run db:studio
 ```
 
+### Supabase PostgreSQL
+
+Create a dedicated Supabase project and disable its Data API. The Express backend connects directly to PostgreSQL through Prisma.
+
+In the Supabase dashboard, open **Connect** and copy both pooler URLs. Use separate credentials for application access and migrations when provisioning the database roles.
+
+| Where | Connection |
+| --- | --- |
+| Vercel production secret `DATABASE_URL` | Transaction pooler (port 6543) with `pgbouncer=true`, `sslmode=require`, and `connection_limit=1`. |
+| Shell environment for `npm run db:migrate:deploy` | Session pooler (port 5432) with `sslmode=require`, or the direct database URL if the runner can reach it. |
+
+Percent-encode special characters in the database password when adding it to a URL. Keep the migration URL out of Vercel runtime secrets. Run migrations once before deploying to initialize or update the target database. Prisma migrations create the schema. Existing local rows require a separate export and import.
+
+To apply migrations from Windows, put the **migration** URL in the ignored `.env.production.local` file as `DATABASE_URL`. From the backend directory, run with Node.js 20.6 or newer:
+
+```powershell
+node --env-file=.env.production.local .\node_modules\prisma\build\index.js migrate deploy
+```
+
+Run this from a shell without a pre-set `DATABASE_URL`, since Node.js gives existing environment variables priority. Keep the local `.env` and Docker Compose for development. Integration tests clear application tables, so only run them with an isolated test database.
+
 ### Running in development mode
 
 ```bash
 npm run dev
 ```
+
+### Vercel
+
+Vercel builds the Express project using `vercel.json` and its Express preset. It imports the HTTP server from `src/app.ts` and routes REST and WebSocket requests to that server. REST paths remain under `/api` and Socket.IO uses `/socket.io` with WebSocket transport. `npm start` still opens a port when run directly.
+
+Set these variables in the Vercel backend project:
+
+| Variable | Value |
+| --- | --- |
+| `CLIENT_URL` | `https://realtime-chat.piotr-ostrowski.eu` |
+| `DATABASE_URL` | Supabase PostgreSQL transaction pooler URL as documented above |
+| `REDIS_URL` | Redis TCP URL with Pub/Sub support. Use TLS (`rediss://`) for a hosted Redis service. Give each deployment environment its own Redis instance. |
+| `ACCESS_TOKEN_SECRET` and `REFRESH_TOKEN_SECRET` | Two distinct randomly generated secrets |
+
+Vercel supplies the `VERCEL` environment variable. The backend requires Redis on Vercel so REST requests and Socket.IO connections on different instances can share events. Local development can use the in-memory adapter. `/api/seed` is disabled in production and on Vercel.
 
 ### Building the project
 

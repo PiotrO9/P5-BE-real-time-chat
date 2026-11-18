@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { MessageResponse } from '../types/message';
 import { FriendInviteResponse, FriendshipResponse, User } from '../types/friends';
 import {
@@ -8,8 +8,6 @@ import {
 	InterServerEvents,
 	SocketData,
 } from '../types/socket';
-
-const prisma = new PrismaClient();
 
 type IoServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 

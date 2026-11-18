@@ -16,11 +16,9 @@ import {
 	emitReactionRemoved,
 	emitMessageRead,
 } from '../socket/socketEmitters';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 
 const messageService = new MessageService();
-const prisma = new PrismaClient();
-
 /**
  * Get all messages for a specific chat
  * GET /api/messages/:chatId/messages

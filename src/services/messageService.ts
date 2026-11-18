@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 import { MessageResponse, MessagesListResponse } from '../types/message';
-
-const prisma = new PrismaClient();
 
 export class MessageService {
 	/**
