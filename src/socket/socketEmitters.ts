@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { prisma } from '../utils/prisma';
+import type { ChatResponse } from '../types/chat';
 import { MessageResponse } from '../types/message';
 import { FriendInviteResponse, FriendshipResponse, User } from '../types/friends';
 import {
@@ -147,11 +148,13 @@ export async function emitUserStatusChange(userId: string, isOnline: boolean, la
 /**
  * Emit new chat created to all participants
  */
-export function emitChatCreated(chat: any, participantIds: string[]) {
+export function emitChatCreated(chat: ChatResponse, participantIds: string[]) {
+	if (participantIds.length === 0) return;
+
 	const io = getIo();
-	participantIds.forEach(userId => {
-		io.to(`user:${userId}`).emit('chat:created', { chat });
-	});
+	const participants = io.in(participantIds.map(userId => `user:${userId}`));
+	participants.socketsJoin(`chat:${chat.id}`);
+	participants.emit('chat:created', { chat });
 }
 
 /**
@@ -165,10 +168,12 @@ export function emitChatUpdated(chatId: string, updates: any) {
 /**
  * Emit member added to chat room
  */
-export function emitMemberAdded(chatId: string, member: any) {
+export function emitMemberAdded(chatId: string, member: { userId: string; username: string }) {
 	const io = getIo();
-	io.to(`chat:${chatId}`).emit('member:added', { chatId, member });
-	io.to(`user:${member.userId}`).emit('member:added', { chatId, member });
+	const chatRoom = `chat:${chatId}`;
+	const memberRoom = `user:${member.userId}`;
+	io.in(memberRoom).socketsJoin(chatRoom);
+	io.to([chatRoom, memberRoom]).emit('member:added', { chatId, member });
 }
 
 /**
@@ -176,7 +181,10 @@ export function emitMemberAdded(chatId: string, member: any) {
  */
 export function emitMemberRemoved(chatId: string, userId: string) {
 	const io = getIo();
-	io.to(`chat:${chatId}`).emit('member:removed', { chatId, userId });
+	const chatRoom = `chat:${chatId}`;
+	const memberRoom = `user:${userId}`;
+	io.in(memberRoom).socketsLeave(chatRoom);
+	io.to([chatRoom, memberRoom]).emit('member:removed', { chatId, userId });
 }
 
 /**

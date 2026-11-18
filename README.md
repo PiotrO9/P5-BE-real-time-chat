@@ -105,6 +105,8 @@ Set these variables in the Vercel backend project:
 
 Vercel supplies the `VERCEL` environment variable. The backend requires Redis on Vercel so REST requests and Socket.IO connections on different instances can share events. Local development can use the in-memory adapter. `/api/seed` is disabled in production and on Vercel.
 
+When an API request creates a chat or changes its membership, Socket.IO updates the chat rooms of already connected users across instances.
+
 ### Building the project
 
 ```bash
